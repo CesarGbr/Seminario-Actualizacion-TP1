@@ -1,0 +1,11 @@
+﻿id,nombre,descripcion,precio_id,categoria_id,proveedor_id
+1,Mouse Gamer RGB,Mouse optico 6 botones,1,1,1
+2,Teclado Mecanico,Switch blue retroiluminado,2,1,2
+3,SSD 1TB,Unidad solida NVMe,3,6,3
+4,Router AX3000,Router WiFi 6 doble banda,4,5,4
+5,Monitor 27 IPS,Monitor 2K 144Hz,5,4,5
+6,Memoria RAM 16GB,Modulo DDR4 3200Mhz,6,2,6
+7,Fuente 750W,Fuente certificada 80 Plus Gold,7,2,7
+8,Notebook Pro 15,Notebook i7 16GB RAM,8,7,8
+9,Auriculares BT,Cancelacion activa de ruido,9,3,9
+10,Webcam FullHD,Camara 1080p con microfono,10,10,10

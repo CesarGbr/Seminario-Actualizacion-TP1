@@ -9,17 +9,26 @@ def _normalize_tipo_nombre(value: str) -> str:
   normalizado = " ".join(base.strip().upper().split())
   if normalizado.startswith("DOLAR "):
     normalizado = normalizado.replace("DOLAR ", "", 1)
+  if "BLUE" in normalizado:
+    return "BLUE"
+  if "OFICIAL" in normalizado:
+    return "OFICIAL"
+  if "BOLSA" in normalizado:
+    return "BOLSA"
+  if "CCL" in normalizado:
+    return "CCL"
+  if "CRIPTO" in normalizado:
+    return "CRIPTO"
+  if "TARJETA" in normalizado:
+    return "TARJETA"
+  if "MAYORISTA" in normalizado:
+    return "MAYORISTA"
   return normalizado
 
 
 class Categoria:
-  """Representa el rubro de un producto."""
-
-  def __init__(self, categoria_id: int | None = None, nombre: str = "", id: int | None = None) -> None:
-    resolved_id = categoria_id if categoria_id is not None else id
-    if resolved_id is None:
-      raise ValueError("Debe informar id de categoria")
-    self.id = resolved_id
+  def __init__(self, id: int, nombre: str) -> None:
+    self.id = id
     self.nombre = nombre
 
   @property
@@ -44,21 +53,9 @@ class Categoria:
 
 
 class Proveedor:
-  """Representa un proveedor de mercaderia."""
-
-  def __init__(
-    self,
-    proveedor_id: int | None = None,
-    nombre_legal: str | None = None,
-    contacto: str = "",
-    id: int | None = None,
-    nombre: str | None = None,
-  ) -> None:
-    resolved_id = proveedor_id if proveedor_id is not None else id
-    if resolved_id is None:
-      raise ValueError("Debe informar id de proveedor")
-    self.id = resolved_id
-    self.nombre_legal = nombre_legal if nombre_legal is not None else (nombre or "")
+  def __init__(self, id: int, nombre: str, contacto: str) -> None:
+    self.id = id
+    self.nombre = nombre
     self.contacto = contacto
 
   @property
@@ -72,14 +69,22 @@ class Proveedor:
     self._id = value
 
   @property
+  def nombre(self) -> str:
+    return self._nombre
+
+  @nombre.setter
+  def nombre(self, value: str) -> None:
+    if not value.strip():
+      raise ValueError("El nombre de proveedor no puede estar vacio")
+    self._nombre = value.strip()
+
+  @property
   def nombre_legal(self) -> str:
-    return self._nombre_legal
+    return self._nombre
 
   @nombre_legal.setter
   def nombre_legal(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El nombre legal no puede estar vacio")
-    self._nombre_legal = value.strip()
+    self.nombre = value
 
   @property
   def contacto(self) -> str:
@@ -93,13 +98,8 @@ class Proveedor:
 
 
 class Moneda:
-  """Entidad de moneda para compatibilidad con notebook."""
-
-  def __init__(self, moneda_id: int | None = None, nombre: str = "", id: int | None = None) -> None:
-    resolved_id = moneda_id if moneda_id is not None else id
-    if resolved_id is None:
-      raise ValueError("Debe informar id de moneda")
-    self.id = resolved_id
+  def __init__(self, id: int, nombre: str) -> None:
+    self.id = id
     self.nombre = nombre
 
   @property
@@ -124,13 +124,8 @@ class Moneda:
 
 
 class TipoCotizacion:
-  """Entidad de tipo de cotizacion para compatibilidad con notebook."""
-
-  def __init__(self, tipo_cotizacion_id: int | None = None, nombre: str = "", id: int | None = None) -> None:
-    resolved_id = tipo_cotizacion_id if tipo_cotizacion_id is not None else id
-    if resolved_id is None:
-      raise ValueError("Debe informar id de tipo cotizacion")
-    self.id = resolved_id
+  def __init__(self, id: int, nombre: str) -> None:
+    self.id = id
     self.nombre = nombre
 
   @property
@@ -156,27 +151,21 @@ class TipoCotizacion:
 
 
 class Precio:
-  """Representa el valor monetario de un producto."""
-
   _next_id = 1
 
   def __init__(
     self,
     valor: float,
     moneda: str | Moneda,
-    precio_id: int | None = None,
-    fecha_actualizacion: date | None = None,
-    id: int | None = None,
     fecha: date | None = None,
+    id: int | None = None,
   ) -> None:
-    resolved_id = precio_id if precio_id is not None else id
-    if resolved_id is None:
-      resolved_id = Precio._next_id
+    self.id = id if id is not None else self._next_id
+    if id is None:
       Precio._next_id += 1
-    self.id = resolved_id
     self.valor = valor
     self.moneda = moneda
-    self.fecha_actualizacion = fecha_actualizacion or fecha or date.today()
+    self.fecha_actualizacion = fecha or date.today()
 
   @property
   def id(self) -> int:
@@ -222,8 +211,6 @@ class Precio:
 
 
 class CotizacionDolar:
-  """Representa una cotizacion del dolar en una fecha dada."""
-
   TIPOS_VALIDOS = {
     "OFICIAL",
     "BLUE",
@@ -236,19 +223,10 @@ class CotizacionDolar:
 
   _next_id = 1
 
-  def __init__(
-    self,
-    valor: float,
-    fecha: date,
-    tipo: str | TipoCotizacion,
-    cotizacion_id: int | None = None,
-    id: int | None = None,
-  ) -> None:
-    resolved_id = cotizacion_id if cotizacion_id is not None else id
-    if resolved_id is None:
-      resolved_id = CotizacionDolar._next_id
+  def __init__(self, valor: float, fecha: date, tipo: str | TipoCotizacion, id: int | None = None) -> None:
+    self.id = id if id is not None else self._next_id
+    if id is None:
       CotizacionDolar._next_id += 1
-    self.id = resolved_id
     self.valor = valor
     self.fecha = fecha
     self.tipo = tipo
@@ -287,10 +265,7 @@ class CotizacionDolar:
 
   @tipo.setter
   def tipo(self, value: str | TipoCotizacion) -> None:
-    if isinstance(value, TipoCotizacion):
-      raw = value.nombre
-    else:
-      raw = value
+    raw = value.nombre if isinstance(value, TipoCotizacion) else value
     normalizado = _normalize_tipo_nombre(raw)
     if normalizado not in self.TIPOS_VALIDOS:
       raise ValueError(f"Tipo de cotizacion invalido: {value}")
@@ -298,26 +273,18 @@ class CotizacionDolar:
 
 
 class Producto:
-  """Entidad central del inventario."""
-
   def __init__(
     self,
-    producto_id: int | None = None,
-    nombre: str = "",
-    descripcion: str = "",
-    precio: Precio | None = None,
-    categoria: Categoria | None = None,
-    proveedor: Proveedor | None = None,
-    id: int | None = None,
+    id: int,
+    nombre: str,
+    descripcion: str,
+    precio: Precio,
+    categoria: Categoria,
+    proveedor: Proveedor,
   ) -> None:
-    resolved_id = producto_id if producto_id is not None else id
-    if resolved_id is None:
-      raise ValueError("Debe informar id de producto")
-    self.id = resolved_id
+    self.id = id
     self.nombre = nombre
     self.descripcion = descripcion
-    if precio is None or categoria is None or proveedor is None:
-      raise ValueError("Producto requiere precio, categoria y proveedor")
     self.precio = precio
     self.categoria = categoria
     self.proveedor = proveedor
@@ -352,10 +319,8 @@ class Producto:
 
 
 class Stock:
-  """Vincula un producto con un almacen y su cantidad."""
-
-  def __init__(self, stock_id: int, producto: Producto, almacen: str, cantidad: int) -> None:
-    self.id = stock_id
+  def __init__(self, id: int, producto: Producto, almacen: str, cantidad: int) -> None:
+    self.id = id
     self.producto = producto
     self.almacen = almacen
     self.cantidad = cantidad

@@ -85,7 +85,7 @@ class PriceManagerConsole:
     if producto is None:
       raise ValueError(f"No existe producto con id {producto_id}")
 
-    precio_actualizado = Precio(producto.precio.id, valor, moneda)
+    precio_actualizado = Precio(id=producto.precio.id, valor=valor, moneda=moneda)
     self._servicio_precio.actualizar(precio_actualizado)
     producto.precio = precio_actualizado
     self._servicio_producto.actualizar(producto)

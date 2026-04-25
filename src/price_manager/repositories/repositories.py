@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import abc
 from datetime import date
@@ -107,11 +107,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
 
 
 class RepositorioBase(IRepositorio[T], Generic[T]):
-  """Implementacion reusable del contrato CRUD.
-
-  Resuelve el caso comun con un diccionario en memoria indexado por id.
-  Los repos concretos heredan esta clase para evitar duplicar codigo.
-  """
+  """Implementacion reusable del contrato CRUD."""
 
   def __init__(self) -> None:
     self._data: dict[int, T] = {}
@@ -144,53 +140,30 @@ class RepositorioBase(IRepositorio[T], Generic[T]):
 
 
 class RepositorioCategoria(RepositorioBase[Categoria]):
-  """Repositorio concreto de Categoria.
-
-  Reutiliza el CRUD generico de RepositorioBase sin reglas extra.
-  """
   pass
 
 
 class RepositorioProveedor(RepositorioBase[Proveedor]):
-  """Repositorio concreto de Proveedor.
-
-  Reutiliza el CRUD generico de RepositorioBase sin reglas extra.
-  """
   pass
 
 
 class RepositorioPrecio(RepositorioBase[Precio]):
-  """Repositorio concreto de Precio.
-
-  Reutiliza el CRUD generico de RepositorioBase sin reglas extra.
-  """
   pass
 
 
 class RepositorioMoneda(RepositorioBase[Moneda]):
-  """Repositorio concreto de Moneda."""
   pass
 
 
 class RepositorioTipoCotizacion(RepositorioBase[TipoCotizacion]):
-  """Repositorio concreto de TipoCotizacion."""
   pass
 
 
 class RepositorioProducto(RepositorioBase[Producto]):
-  """Repositorio concreto de Producto.
-
-  Reutiliza el CRUD generico de RepositorioBase sin reglas extra.
-  """
   pass
 
 
 class RepositorioStock(IRepositorioStock):
-  """Implementacion en memoria para Stock.
-
-  Mantiene indice por id y por producto_id para garantizar
-  un solo stock por producto y consultas eficientes por producto.
-  """
   def __init__(self) -> None:
     self._by_id: dict[int, Stock] = {}
     self._by_producto_id: dict[int, int] = {}
@@ -246,12 +219,6 @@ class RepositorioStock(IRepositorioStock):
 
 
 class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
-  """Implementacion en memoria para CotizacionDolar.
-
-    Garantiza que no haya duplicados con la misma combinación de tipo y fecha, 
-    y permite consultar el historial por tipo. 
-    Por eso no usa directamente el CRUD base.
-  """
   def __init__(self) -> None:
     self._data: dict[int, CotizacionDolar] = {}
 

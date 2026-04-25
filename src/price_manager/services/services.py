@@ -1,16 +1,36 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import date
+import unicodedata
 
-from price_manager.entities.entities import Categoria, CotizacionDolar, Precio, Producto, Proveedor, Stock
+from price_manager.entities.entities import (
+  Categoria,
+  CotizacionDolar,
+  Moneda,
+  Precio,
+  Producto,
+  Proveedor,
+  Stock,
+  TipoCotizacion,
+)
 from price_manager.repositories.repositories import (
   RepositorioCategoria,
   RepositorioCotizacionDolar,
+  RepositorioMoneda,
   RepositorioPrecio,
   RepositorioProducto,
   RepositorioProveedor,
   RepositorioStock,
+  RepositorioTipoCotizacion,
 )
+
+
+def _normalizar_tipo(value: str) -> str:
+  base = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+  normalizado = " ".join(base.strip().upper().split())
+  if normalizado.startswith("DOLAR "):
+    normalizado = normalizado.replace("DOLAR ", "", 1)
+  return normalizado
 
 
 class ServicioCategoria:
@@ -88,6 +108,50 @@ class ServicioPrecio:
     return self._repo.eliminar(precio_id)
 
 
+class ServicioMoneda:
+  """Capa de servicio para Moneda."""
+
+  def __init__(self, repo: RepositorioMoneda) -> None:
+    self._repo = repo
+
+  def crear(self, moneda: Moneda) -> Moneda:
+    return self._repo.crear(moneda)
+
+  def buscar_por_id(self, moneda_id: int) -> Moneda | None:
+    return self._repo.leer_por_id(moneda_id)
+
+  def listar_todos(self) -> list[Moneda]:
+    return self._repo.leer_todos()
+
+  def actualizar(self, moneda: Moneda) -> Moneda:
+    return self._repo.actualizar(moneda)
+
+  def eliminar(self, moneda_id: int) -> bool:
+    return self._repo.eliminar(moneda_id)
+
+
+class ServicioTipoCotizacion:
+  """Capa de servicio para TipoCotizacion."""
+
+  def __init__(self, repo: RepositorioTipoCotizacion) -> None:
+    self._repo = repo
+
+  def crear(self, tipo_cotizacion: TipoCotizacion) -> TipoCotizacion:
+    return self._repo.crear(tipo_cotizacion)
+
+  def buscar_por_id(self, tipo_cotizacion_id: int) -> TipoCotizacion | None:
+    return self._repo.leer_por_id(tipo_cotizacion_id)
+
+  def listar_todos(self) -> list[TipoCotizacion]:
+    return self._repo.leer_todos()
+
+  def actualizar(self, tipo_cotizacion: TipoCotizacion) -> TipoCotizacion:
+    return self._repo.actualizar(tipo_cotizacion)
+
+  def eliminar(self, tipo_cotizacion_id: int) -> bool:
+    return self._repo.eliminar(tipo_cotizacion_id)
+
+
 class ServicioCotizacionDolar:
   """Capa de servicio para CotizacionDolar.
 
@@ -95,8 +159,13 @@ class ServicioCotizacionDolar:
   especificas por tipo/fecha e historico por tipo.
   """
 
-  def __init__(self, repo: RepositorioCotizacionDolar) -> None:
+  def __init__(
+    self,
+    repo: RepositorioCotizacionDolar,
+    servicio_tipo_cotizacion: ServicioTipoCotizacion | None = None,
+  ) -> None:
     self._repo = repo
+    self._servicio_tipo_cotizacion = servicio_tipo_cotizacion
 
   def crear(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
     return self._repo.crear(cotizacion)
@@ -112,6 +181,17 @@ class ServicioCotizacionDolar:
 
   def listar_historico_por_tipo(self, tipo: str) -> list[CotizacionDolar]:
     return self._repo.leer_historico_por_tipo(tipo)
+
+  def registrar_cotizacion(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
+    return self.crear(cotizacion)
+
+  def obtener_historico(self, tipo_cotizacion_id: int) -> list[CotizacionDolar]:
+    if self._servicio_tipo_cotizacion is None:
+      raise ValueError("ServicioTipoCotizacion no configurado")
+    tipo = self._servicio_tipo_cotizacion.buscar_por_id(tipo_cotizacion_id)
+    if tipo is None:
+      raise ValueError(f"No existe tipo de cotizacion con id {tipo_cotizacion_id}")
+    return self._repo.leer_historico_por_tipo(_normalizar_tipo(tipo.nombre))
 
   def actualizar(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
     return self._repo.actualizar(cotizacion)
@@ -147,6 +227,12 @@ class ServicioProducto:
   def buscar_por_id(self, producto_id: int) -> Producto | None:
     return self._repo.leer_por_id(producto_id)
 
+  def obtener(self, producto_id: int) -> Producto:
+    producto = self.buscar_por_id(producto_id)
+    if producto is None:
+      raise ValueError(f"No existe producto con id {producto_id}")
+    return producto
+
   def listar_todos(self) -> list[Producto]:
     return self._repo.leer_todos()
 
@@ -154,7 +240,10 @@ class ServicioProducto:
     return self._repo.actualizar(producto)
 
   def eliminar(self, producto_id: int) -> bool:
-    return self._repo.eliminar(producto_id)
+    eliminado = self._repo.eliminar(producto_id)
+    if not eliminado:
+      raise ValueError(f"No existe producto con id {producto_id}")
+    return True
 
 
 class ServicioStock:
@@ -190,3 +279,26 @@ class ServicioStock:
 
   def eliminar_por_id(self, stock_id: int) -> bool:
     return self._repo.eliminar_por_id(stock_id)
+
+  def registrar_movimiento(self, producto_id: int, delta: int) -> Stock:
+    stock = self.buscar_por_producto(producto_id)
+    if stock is None:
+      if delta < 0:
+        raise ValueError("No se puede dejar stock en negativo")
+      producto = self._servicio_producto.buscar_por_id(producto_id)
+      if producto is None:
+        raise ValueError(f"No existe producto con id {producto_id}")
+      next_stock_id = len(self._repo.leer_todos()) + 1
+      return self._repo.crear(Stock(next_stock_id, producto, "GENERAL", delta))
+
+    nueva_cantidad = stock.cantidad + delta
+    if nueva_cantidad < 0:
+      raise ValueError("No se puede dejar stock en negativo")
+    stock.cantidad = nueva_cantidad
+    return self._repo.actualizar(stock)
+
+  def obtener_stock(self, producto_id: int) -> int:
+    stock = self.buscar_por_producto(producto_id)
+    if stock is None:
+      raise ValueError(f"No existe stock para producto {producto_id}")
+    return stock.cantidad

@@ -13,7 +13,29 @@ from price_manager.entities.entities import (
   Stock,
   TipoCotizacion,
 )
-from price_manager.repositories.repositories import (
+
+
+def _normalizar_tipo(value: str) -> str:
+  base = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+  normalizado = " ".join(base.strip().upper().split())
+  if normalizado.startswith("DOLAR "):
+    normalizado = normalizado.replace("DOLAR ", "", 1)
+  if "BLUE" in normalizado:
+    return "BLUE"
+  if "OFICIAL" in normalizado:
+    return "OFICIAL"
+  if "BOLSA" in normalizado:
+    return "BOLSA"
+  if "CCL" in normalizado:
+    return "CCL"
+  if "CRIPTO" in normalizado:
+    return "CRIPTO"
+  if "TARJETA" in normalizado:
+    return "TARJETA"
+  if "MAYORISTA" in normalizado:
+    return "MAYORISTA"
+  return normalizado
+from src.price_manager.repositories.repositories import (
   RepositorioCategoria,
   RepositorioCotizacionDolar,
   RepositorioMoneda,
@@ -25,20 +47,7 @@ from price_manager.repositories.repositories import (
 )
 
 
-def _normalizar_tipo(value: str) -> str:
-  base = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-  normalizado = " ".join(base.strip().upper().split())
-  if normalizado.startswith("DOLAR "):
-    normalizado = normalizado.replace("DOLAR ", "", 1)
-  return normalizado
-
-
 class ServicioCategoria:
-  """Capa de servicio para Categoria.
-
-  Se inicializa con RepositorioCategoria y delega operaciones CRUD.
-  """
-
   def __init__(self, repo: RepositorioCategoria) -> None:
     self._repo = repo
 
@@ -59,11 +68,6 @@ class ServicioCategoria:
 
 
 class ServicioProveedor:
-  """Capa de servicio para Proveedor.
-
-  Se inicializa con RepositorioProveedor y delega operaciones CRUD.
-  """
-
   def __init__(self, repo: RepositorioProveedor) -> None:
     self._repo = repo
 
@@ -83,34 +87,7 @@ class ServicioProveedor:
     return self._repo.eliminar(proveedor_id)
 
 
-class ServicioPrecio:
-  """Capa de servicio para Precio.
-
-  Se inicializa con RepositorioPrecio y delega operaciones CRUD.
-  """
-
-  def __init__(self, repo: RepositorioPrecio) -> None:
-    self._repo = repo
-
-  def crear(self, precio: Precio) -> Precio:
-    return self._repo.crear(precio)
-
-  def buscar_por_id(self, precio_id: int) -> Precio | None:
-    return self._repo.leer_por_id(precio_id)
-
-  def listar_todos(self) -> list[Precio]:
-    return self._repo.leer_todos()
-
-  def actualizar(self, precio: Precio) -> Precio:
-    return self._repo.actualizar(precio)
-
-  def eliminar(self, precio_id: int) -> bool:
-    return self._repo.eliminar(precio_id)
-
-
 class ServicioMoneda:
-  """Capa de servicio para Moneda."""
-
   def __init__(self, repo: RepositorioMoneda) -> None:
     self._repo = repo
 
@@ -130,9 +107,27 @@ class ServicioMoneda:
     return self._repo.eliminar(moneda_id)
 
 
-class ServicioTipoCotizacion:
-  """Capa de servicio para TipoCotizacion."""
+class ServicioPrecio:
+  def __init__(self, repo: RepositorioPrecio) -> None:
+    self._repo = repo
 
+  def crear(self, precio: Precio) -> Precio:
+    return self._repo.crear(precio)
+
+  def buscar_por_id(self, precio_id: int) -> Precio | None:
+    return self._repo.leer_por_id(precio_id)
+
+  def listar_todos(self) -> list[Precio]:
+    return self._repo.leer_todos()
+
+  def actualizar(self, precio: Precio) -> Precio:
+    return self._repo.actualizar(precio)
+
+  def eliminar(self, precio_id: int) -> bool:
+    return self._repo.eliminar(precio_id)
+
+
+class ServicioTipoCotizacion:
   def __init__(self, repo: RepositorioTipoCotizacion) -> None:
     self._repo = repo
 
@@ -153,12 +148,6 @@ class ServicioTipoCotizacion:
 
 
 class ServicioCotizacionDolar:
-  """Capa de servicio para CotizacionDolar.
-
-  Se inicializa con RepositorioCotizacionDolar y expone busquedas
-  especificas por tipo/fecha e historico por tipo.
-  """
-
   def __init__(
     self,
     repo: RepositorioCotizacionDolar,
@@ -169,6 +158,9 @@ class ServicioCotizacionDolar:
 
   def crear(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
     return self._repo.crear(cotizacion)
+
+  def registrar_cotizacion(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
+    return self.crear(cotizacion)
 
   def buscar_por_id(self, cotizacion_id: int) -> CotizacionDolar | None:
     return self._repo.leer_por_id(cotizacion_id)
@@ -181,9 +173,6 @@ class ServicioCotizacionDolar:
 
   def listar_historico_por_tipo(self, tipo: str) -> list[CotizacionDolar]:
     return self._repo.leer_historico_por_tipo(tipo)
-
-  def registrar_cotizacion(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
-    return self.crear(cotizacion)
 
   def obtener_historico(self, tipo_cotizacion_id: int) -> list[CotizacionDolar]:
     if self._servicio_tipo_cotizacion is None:
@@ -201,12 +190,6 @@ class ServicioCotizacionDolar:
 
 
 class ServicioProducto:
-  """Capa de servicio para Producto.
-
-  Se inicializa con RepositorioProducto y con servicios auxiliares
-  de Categoria y Proveedor para validar referencias antes de crear.
-  """
-
   def __init__(
     self,
     repo: RepositorioProducto,
@@ -247,12 +230,6 @@ class ServicioProducto:
 
 
 class ServicioStock:
-  """Capa de servicio para Stock.
-
-  Se inicializa con RepositorioStock y ServicioProducto para validar
-  que el producto exista antes de registrar stock.
-  """
-
   def __init__(self, repo: RepositorioStock, servicio_producto: ServicioProducto) -> None:
     self._repo = repo
     self._servicio_producto = servicio_producto
@@ -289,7 +266,7 @@ class ServicioStock:
       if producto is None:
         raise ValueError(f"No existe producto con id {producto_id}")
       next_stock_id = len(self._repo.leer_todos()) + 1
-      return self._repo.crear(Stock(next_stock_id, producto, "GENERAL", delta))
+      return self._repo.crear(Stock(id=next_stock_id, producto=producto, almacen="GENERAL", cantidad=delta))
 
     nueva_cantidad = stock.cantidad + delta
     if nueva_cantidad < 0:

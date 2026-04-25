@@ -48,18 +48,20 @@ def cargar_datos_iniciales(
 
   # Entidades base sin dependencias externas.
   for row in _read_csv(csv_path / "categorias.csv"):
-    servicio_categoria.crear(Categoria(int(row["id"]), row["nombre"]))
+    servicio_categoria.crear(Categoria(id=int(row["id"]), nombre=row["nombre"]))
 
   for row in _read_csv(csv_path / "proveedores.csv"):
-    servicio_proveedor.crear(Proveedor(int(row["id"]), row["nombre_legal"], row["contacto"]))
+    servicio_proveedor.crear(
+      Proveedor(id=int(row["id"]), nombre=row["nombre_legal"], contacto=row["contacto"])
+    )
 
   for row in _read_csv(csv_path / "cotizaciones.csv"):
     servicio_cotizacion.crear(
       CotizacionDolar(
-        int(row["id"]),
-        float(row["valor"]),
-        date.fromisoformat(row["fecha"]),
-        row["tipo"],
+        id=int(row["id"]),
+        valor=float(row["valor"]),
+        fecha=date.fromisoformat(row["fecha"]),
+        tipo=row["tipo"],
       )
     )
 
@@ -68,10 +70,10 @@ def cargar_datos_iniciales(
   for row in _read_csv(csv_path / "precios.csv"):
     precio = servicio_precio.crear(
       Precio(
-        int(row["id"]),
-        float(row["valor"]),
-        row["moneda"],
-        date.fromisoformat(row["fecha_actualizacion"]),
+        id=int(row["id"]),
+        valor=float(row["valor"]),
+        moneda=row["moneda"],
+        fecha=date.fromisoformat(row["fecha_actualizacion"]),
       )
     )
     precios_por_id[int(row["id"])] = precio
@@ -85,12 +87,12 @@ def cargar_datos_iniciales(
 
     servicio_producto.crear(
       Producto(
-        int(row["id"]),
-        row["nombre"],
-        row["descripcion"],
-        precios_por_id[int(row["precio_id"])],
-        categoria,
-        proveedor,
+        id=int(row["id"]),
+        nombre=row["nombre"],
+        descripcion=row["descripcion"],
+        precio=precios_por_id[int(row["precio_id"])],
+        categoria=categoria,
+        proveedor=proveedor,
       )
     )
 
@@ -102,9 +104,9 @@ def cargar_datos_iniciales(
 
     servicio_stock.crear(
       Stock(
-        int(row["id"]),
-        producto,
-        row["almacen"],
-        int(row["cantidad"]),
+        id=int(row["id"]),
+        producto=producto,
+        almacen=row["almacen"],
+        cantidad=int(row["cantidad"]),
       )
     )

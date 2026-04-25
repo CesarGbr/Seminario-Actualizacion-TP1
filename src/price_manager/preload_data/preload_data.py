@@ -28,6 +28,14 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
     return list(csv.DictReader(file))
 
 
+def _write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
+  path.parent.mkdir(parents=True, exist_ok=True)
+  with path.open("w", encoding="utf-8", newline="") as file:
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+
 def cargar_datos_iniciales(
   servicio_categoria: ServicioCategoria,
   servicio_proveedor: ServicioProveedor,
@@ -110,3 +118,78 @@ def cargar_datos_iniciales(
         cantidad=int(row["cantidad"]),
       )
     )
+
+
+def guardar_datos(
+  servicio_categoria: ServicioCategoria,
+  servicio_proveedor: ServicioProveedor,
+  servicio_precio: ServicioPrecio,
+  servicio_cotizacion: ServicioCotizacionDolar,
+  servicio_producto: ServicioProducto,
+  servicio_stock: ServicioStock,
+  base_path: Path | None = None,
+) -> None:
+  """Persistencia de salida: serializa estado en memoria a CSV."""
+  csv_path = base_path or Path(__file__).resolve().parents[1] / "migrations" / "csv"
+
+  categorias = [
+    {"id": str(c.id), "nombre": c.nombre}
+    for c in sorted(servicio_categoria.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(csv_path / "categorias.csv", categorias, ["id", "nombre"])
+
+  proveedores = [
+    {"id": str(p.id), "nombre_legal": p.nombre_legal, "contacto": p.contacto}
+    for p in sorted(servicio_proveedor.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(csv_path / "proveedores.csv", proveedores, ["id", "nombre_legal", "contacto"])
+
+  cotizaciones = [
+    {
+      "id": str(c.id),
+      "valor": f"{c.valor:.4f}",
+      "fecha": c.fecha.isoformat(),
+      "tipo": c.tipo,
+    }
+    for c in sorted(servicio_cotizacion.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(csv_path / "cotizaciones.csv", cotizaciones, ["id", "valor", "fecha", "tipo"])
+
+  precios = [
+    {
+      "id": str(p.id),
+      "valor": f"{p.valor:.4f}",
+      "moneda": p.moneda,
+      "fecha_actualizacion": p.fecha_actualizacion.isoformat(),
+    }
+    for p in sorted(servicio_precio.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(csv_path / "precios.csv", precios, ["id", "valor", "moneda", "fecha_actualizacion"])
+
+  productos = [
+    {
+      "id": str(p.id),
+      "nombre": p.nombre,
+      "descripcion": p.descripcion,
+      "precio_id": str(p.precio.id),
+      "categoria_id": str(p.categoria.id),
+      "proveedor_id": str(p.proveedor.id),
+    }
+    for p in sorted(servicio_producto.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(
+    csv_path / "productos.csv",
+    productos,
+    ["id", "nombre", "descripcion", "precio_id", "categoria_id", "proveedor_id"],
+  )
+
+  stock = [
+    {
+      "id": str(s.id),
+      "producto_id": str(s.producto.id),
+      "almacen": s.almacen,
+      "cantidad": str(s.cantidad),
+    }
+    for s in sorted(servicio_stock.listar_todos(), key=lambda x: x.id)
+  ]
+  _write_csv(csv_path / "stock.csv", stock, ["id", "producto_id", "almacen", "cantidad"])

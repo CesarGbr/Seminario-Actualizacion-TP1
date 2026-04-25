@@ -4,7 +4,16 @@ import abc
 from datetime import date
 from typing import Generic, TypeVar
 
-from price_manager.entities.entities import Categoria, CotizacionDolar, Precio, Producto, Proveedor, Stock
+from price_manager.entities.entities import (
+  Categoria,
+  CotizacionDolar,
+  Moneda,
+  Precio,
+  Producto,
+  Proveedor,
+  Stock,
+  TipoCotizacion,
+)
 
 T = TypeVar("T")
 
@@ -155,6 +164,16 @@ class RepositorioPrecio(RepositorioBase[Precio]):
 
   Reutiliza el CRUD generico de RepositorioBase sin reglas extra.
   """
+  pass
+
+
+class RepositorioMoneda(RepositorioBase[Moneda]):
+  """Repositorio concreto de Moneda."""
+  pass
+
+
+class RepositorioTipoCotizacion(RepositorioBase[TipoCotizacion]):
+  """Repositorio concreto de TipoCotizacion."""
   pass
 
 

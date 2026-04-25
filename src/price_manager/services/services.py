@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 import unicodedata
+import urllib.error
+import urllib.request
+import re
+from difflib import SequenceMatcher
 
 from price_manager.entities.entities import (
   Categoria,
@@ -45,6 +50,153 @@ def _normalizar_tipo(value: str) -> str:
   if "MAYORISTA" in normalizado:
     return "MAYORISTA"
   return normalizado
+
+
+def _fetch_dolar_rate(tipo: str) -> float:
+  """Obtiene cotizacion desde API publica en tiempo real."""
+  normalized = _normalizar_tipo(tipo)
+  url = "https://dolarapi.com/v1/dolares"
+  request = urllib.request.Request(
+    url,
+    headers={
+      "User-Agent": "PriceManagerCLI/1.0 (+https://books.toscrape.com/)",
+      "Accept": "application/json",
+    },
+  )
+  try:
+    with urllib.request.urlopen(request, timeout=10) as response:
+      payload = json.loads(response.read().decode("utf-8"))
+  except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+    payload = None
+
+  by_tipo = {
+    "OFICIAL": {"oficial"},
+    "BLUE": {"blue"},
+    "BOLSA": {"bolsa", "mep"},
+    "CCL": {"contadoconliqui", "ccl"},
+    "CRIPTO": {"cripto"},
+    "TARJETA": {"tarjeta"},
+    "MAYORISTA": {"mayorista"},
+  }
+  candidates = by_tipo.get(normalized, {normalized.lower()})
+  if isinstance(payload, list):
+    for row in payload:
+      casa = str(row.get("casa", "")).lower().replace(" ", "")
+      nombre = str(row.get("nombre", "")).lower().replace(" ", "")
+      if any(candidate in casa or candidate in nombre for candidate in candidates):
+        value = row.get("venta") or row.get("promedio")
+        if value is None:
+          continue
+        return float(value)
+
+  # Fallback por endpoint especifico por tipo (mas estable en algunos entornos).
+  casa = next(iter(candidates))
+  fallback_url = f"https://dolarapi.com/v1/dolares/{casa}"
+  fallback_request = urllib.request.Request(
+    fallback_url,
+    headers={
+      "User-Agent": "PriceManagerCLI/1.0 (+https://books.toscrape.com/)",
+      "Accept": "application/json",
+    },
+  )
+  try:
+    with urllib.request.urlopen(fallback_request, timeout=10) as response:
+      row = json.loads(response.read().decode("utf-8"))
+      value = row.get("venta") or row.get("promedio")
+      if value is None:
+        raise RuntimeError("Respuesta sin campo de cotizacion")
+      return float(value)
+  except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+    raise RuntimeError("No se pudo consultar cotizacion online") from exc
+
+  raise RuntimeError(f"No hay cotizacion online para tipo {normalized}")
+
+
+class ServicioCompetenciaWeb:
+  """Consulta precios de referencia en books.toscrape.com."""
+
+  _BOOKS_BASE_URL = "https://books.toscrape.com/catalogue/"
+  _BOOKS_INDEX = "https://books.toscrape.com/"
+
+  @staticmethod
+  def _fetch_page(url: str) -> str:
+    try:
+      with urllib.request.urlopen(url, timeout=10) as response:
+        return response.read().decode("utf-8", errors="ignore")
+    except (urllib.error.URLError, TimeoutError) as exc:
+      raise RuntimeError("No se pudo consultar web de competencia") from exc
+
+  def obtener_catalogo(self, limit: int = 40) -> list[dict[str, float | str]]:
+    """Devuelve items [{title, price_gbp, url}] parseados desde books.toscrape."""
+    url = self._BOOKS_INDEX
+    items: list[dict[str, float | str]] = []
+    while url and len(items) < limit:
+      html = self._fetch_page(url)
+      pattern = re.compile(
+        r'<article class="product_pod".*?<h3><a href="(?P<href>[^"]+)" title="(?P<title>[^"]+)".*?'
+        r'<p class="price_color">.?(?P<price>\d+\.\d+)</p>',
+        re.S,
+      )
+      for match in pattern.finditer(html):
+        href = match.group("href")
+        title = match.group("title").strip()
+        price = float(match.group("price"))
+        full_url = self._BOOKS_BASE_URL + href.replace("../", "")
+        items.append({"title": title, "price_gbp": price, "url": full_url})
+        if len(items) >= limit:
+          break
+      next_match = re.search(r'<li class="next"><a href="([^"]+)"', html)
+      if next_match:
+        next_page = next_match.group(1)
+        if "/catalogue/" in url:
+          base = url.rsplit("/", 1)[0] + "/"
+        else:
+          base = self._BOOKS_BASE_URL
+        url = base + next_page
+      else:
+        url = ""
+    return items
+
+  def comparar_producto(self, nombre_producto: str, precio_local: float) -> dict[str, float | str]:
+    """Compara por similitud de nombre y devuelve mejor match encontrado."""
+    catalog = self.obtener_catalogo(limit=60)
+    if not catalog:
+      raise RuntimeError("No se encontraron productos en la web de competencia")
+    product_tokens = {tok for tok in re.split(r"\W+", nombre_producto.lower()) if tok}
+
+    def score(item: dict[str, float | str]) -> tuple[float, int, float]:
+      title = str(item["title"]).lower()
+      title_tokens = {tok for tok in re.split(r"\W+", title) if tok}
+      overlap = len(product_tokens & title_tokens)
+      ratio = SequenceMatcher(None, nombre_producto.lower(), title).ratio()
+      # desempata por menor diferencia de precio relativa
+      competitor_price = float(item["price_gbp"])
+      relative_diff = abs(precio_local - competitor_price)
+      return (ratio, overlap, -relative_diff)
+
+    ranking = sorted(catalog, key=score, reverse=True)
+    best = ranking[0]
+    best_ratio = score(best)[0]
+    # Si el match es muy pobre, se informa ambiguedad con sugerencias.
+    if best_ratio < 0.35:
+      suggestions = ", ".join(str(item["title"]) for item in ranking[:5])
+      raise RuntimeError(
+        "Busqueda ambigua en competencia; sugerencias: "
+        f"{suggestions}"
+      )
+
+    competitor_price = float(best["price_gbp"])
+    diff = precio_local - competitor_price
+    diff_pct = (diff / competitor_price * 100) if competitor_price else 0.0
+    return {
+      "competitor_title": str(best["title"]),
+      "competitor_price_gbp": competitor_price,
+      "competitor_url": str(best["url"]),
+      "local_price": float(precio_local),
+      "difference": diff,
+      "difference_pct": diff_pct,
+      "match_confidence": best_ratio * 100,
+    }
 
 class ServicioCategoria:
   def __init__(self, repo: RepositorioCategoria) -> None:
@@ -180,6 +332,22 @@ class ServicioCotizacionDolar:
     if tipo is None:
       raise ValueError(f"No existe tipo de cotizacion con id {tipo_cotizacion_id}")
     return self._repo.leer_historico_por_tipo(_normalizar_tipo(tipo.nombre))
+
+  def obtener_ultima_por_tipo(self, tipo: str) -> CotizacionDolar | None:
+    historico = self._repo.leer_historico_por_tipo(_normalizar_tipo(tipo))
+    if not historico:
+      return None
+    return historico[-1]
+
+  def actualizar_cotizacion_tiempo_real(self, tipo: str = "OFICIAL") -> CotizacionDolar:
+    valor = _fetch_dolar_rate(tipo)
+    return self.crear(
+      CotizacionDolar(
+        valor=valor,
+        fecha=date.today(),
+        tipo=_normalizar_tipo(tipo),
+      )
+    )
 
   def actualizar(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
     return self._repo.actualizar(cotizacion)

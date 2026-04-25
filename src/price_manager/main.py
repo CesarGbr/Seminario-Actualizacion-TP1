@@ -8,7 +8,7 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
   sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from price_manager.preload_data.preload_data import cargar_datos_iniciales
+from price_manager.preload_data.preload_data import cargar_datos_iniciales, guardar_datos
 from price_manager.repositories.repositories import (
   RepositorioCategoria,
   RepositorioCotizacionDolar,
@@ -19,6 +19,7 @@ from price_manager.repositories.repositories import (
 )
 from price_manager.services.services import (
   ServicioCategoria,
+  ServicioCompetenciaWeb,
   ServicioCotizacionDolar,
   ServicioPrecio,
   ServicioProducto,
@@ -46,6 +47,7 @@ def main(import_default_data: bool = True) -> None:
   servicio_proveedor = ServicioProveedor(repo_proveedor)
   servicio_precio = ServicioPrecio(repo_precio)
   servicio_cotizacion = ServicioCotizacionDolar(repo_cotizacion)
+  servicio_competencia = ServicioCompetenciaWeb()
   servicio_producto = ServicioProducto(repo_producto, servicio_categoria, servicio_proveedor)
   servicio_stock = ServicioStock(repo_stock, servicio_producto)
 
@@ -66,8 +68,21 @@ def main(import_default_data: bool = True) -> None:
     servicio_stock,
     servicio_precio,
     servicio_cotizacion,
+    servicio_competencia,
+    servicio_categoria,
+    servicio_proveedor,
   )
-  console.run()
+  try:
+    console.run()
+  finally:
+    guardar_datos(
+      servicio_categoria,
+      servicio_proveedor,
+      servicio_precio,
+      servicio_cotizacion,
+      servicio_producto,
+      servicio_stock,
+    )
 
 
 if __name__ == "__main__":

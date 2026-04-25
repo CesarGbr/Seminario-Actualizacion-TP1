@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 
 # Si se ejecuta este archivo directamente (python src/price_manager/main.py),
-# agrega `src` al path para que funcionen los imports del paquete `price_manager`.
+# agrega la raiz del proyecto para que funcionen los imports `src.price_manager`.
 if __package__ is None or __package__ == "":
-  sys.path.append(str(Path(__file__).resolve().parents[1]))
+  sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from price_manager.preload_data.preload_data import cargar_datos_iniciales
 from price_manager.repositories.repositories import (
@@ -28,7 +28,7 @@ from price_manager.services.services import (
 from price_manager.ui.console import PriceManagerConsole
 
 
-def main() -> None:
+def main(import_default_data: bool = True) -> None:
   """Punto de entrada de la aplicacion.
 
   Inicializa dependencias, precarga datos semilla y lanza la UI de consola.
@@ -49,15 +49,16 @@ def main() -> None:
   servicio_producto = ServicioProducto(repo_producto, servicio_categoria, servicio_proveedor)
   servicio_stock = ServicioStock(repo_stock, servicio_producto)
 
-  # Carga inicial desde CSV para disponer de datos al iniciar la app.
-  cargar_datos_iniciales(
-    servicio_categoria,
-    servicio_proveedor,
-    servicio_precio,
-    servicio_cotizacion,
-    servicio_producto,
-    servicio_stock,
-  )
+  # Carga inicial opcional desde CSV para disponer de datos al iniciar la app.
+  if import_default_data:
+    cargar_datos_iniciales(
+      servicio_categoria,
+      servicio_proveedor,
+      servicio_precio,
+      servicio_cotizacion,
+      servicio_producto,
+      servicio_stock,
+    )
 
   # Interfaz de usuario por consola.
   console = PriceManagerConsole(

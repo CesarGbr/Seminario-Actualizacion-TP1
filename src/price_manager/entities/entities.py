@@ -160,9 +160,12 @@ class Precio:
     fecha: date | None = None,
     id: int | None = None,
   ) -> None:
-    self.id = id if id is not None else self._next_id
+    resolved_id = id if id is not None else self._next_id
+    self.id = resolved_id
     if id is None:
       Precio._next_id += 1
+    elif resolved_id >= Precio._next_id:
+      Precio._next_id = resolved_id + 1
     self.valor = valor
     self.moneda = moneda
     self.fecha_actualizacion = fecha or date.today()
@@ -224,9 +227,12 @@ class CotizacionDolar:
   _next_id = 1
 
   def __init__(self, valor: float, fecha: date, tipo: str | TipoCotizacion, id: int | None = None) -> None:
-    self.id = id if id is not None else self._next_id
+    resolved_id = id if id is not None else self._next_id
+    self.id = resolved_id
     if id is None:
       CotizacionDolar._next_id += 1
+    elif resolved_id >= CotizacionDolar._next_id:
+      CotizacionDolar._next_id = resolved_id + 1
     self.valor = valor
     self.fecha = fecha
     self.tipo = tipo

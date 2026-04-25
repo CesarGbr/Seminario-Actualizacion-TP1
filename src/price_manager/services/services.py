@@ -14,6 +14,16 @@ from price_manager.entities.entities import (
   TipoCotizacion,
 )
 
+from price_manager.repositories.repositories import (
+  RepositorioCategoria,
+  RepositorioCotizacionDolar,
+  RepositorioMoneda,
+  RepositorioPrecio,
+  RepositorioProducto,
+  RepositorioProveedor,
+  RepositorioStock,
+  RepositorioTipoCotizacion,
+)
 
 def _normalizar_tipo(value: str) -> str:
   base = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
@@ -35,17 +45,6 @@ def _normalizar_tipo(value: str) -> str:
   if "MAYORISTA" in normalizado:
     return "MAYORISTA"
   return normalizado
-from src.price_manager.repositories.repositories import (
-  RepositorioCategoria,
-  RepositorioCotizacionDolar,
-  RepositorioMoneda,
-  RepositorioPrecio,
-  RepositorioProducto,
-  RepositorioProveedor,
-  RepositorioStock,
-  RepositorioTipoCotizacion,
-)
-
 
 class ServicioCategoria:
   def __init__(self, repo: RepositorioCategoria) -> None:

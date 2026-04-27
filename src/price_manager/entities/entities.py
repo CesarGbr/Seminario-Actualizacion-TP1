@@ -1,3 +1,5 @@
+﻿# %%writefile price_manager/entities/entities.py
+
 from __future__ import annotations
 
 from datetime import date
@@ -5,358 +7,429 @@ import unicodedata
 
 
 def _normalize_tipo_nombre(value: str) -> str:
-  base = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-  normalizado = " ".join(base.strip().upper().split())
-  if normalizado.startswith("DOLAR "):
-    normalizado = normalizado.replace("DOLAR ", "", 1)
-  if "BLUE" in normalizado:
-    return "BLUE"
-  if "OFICIAL" in normalizado:
-    return "OFICIAL"
-  if "BOLSA" in normalizado:
-    return "BOLSA"
-  if "CCL" in normalizado:
-    return "CCL"
-  if "CRIPTO" in normalizado:
-    return "CRIPTO"
-  if "TARJETA" in normalizado:
-    return "TARJETA"
-  if "MAYORISTA" in normalizado:
-    return "MAYORISTA"
-  return normalizado
+    base = (
+        unicodedata.normalize("NFKD", value)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    normalizado = " ".join(base.strip().upper().split())
+
+    if normalizado.startswith("DOLAR "):
+        normalizado = normalizado.replace("DOLAR ", "", 1)
+
+    if "BLUE" in normalizado:
+        return "BLUE"
+    if "OFICIAL" in normalizado:
+        return "OFICIAL"
+    if "BOLSA" in normalizado:
+        return "BOLSA"
+    if "CCL" in normalizado:
+        return "CCL"
+    if "CRIPTO" in normalizado:
+        return "CRIPTO"
+    if "TARJETA" in normalizado:
+        return "TARJETA"
+    if "MAYORISTA" in normalizado:
+        return "MAYORISTA"
+
+    return normalizado
 
 
 class Categoria:
-  def __init__(self, id: int, nombre: str) -> None:
-    self.id = id
-    self.nombre = nombre
+    def __init__(self, id: int, nombre: str) -> None:
+        self.id = id
+        self.nombre = nombre
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de categoria debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de categoria debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def nombre(self) -> str:
-    return self._nombre
+    @property
+    def nombre(self) -> str:
+        return self._nombre
 
-  @nombre.setter
-  def nombre(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El nombre de categoria no puede estar vacio")
-    self._nombre = value.strip()
+    @nombre.setter
+    def nombre(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El nombre de categoria no puede estar vacio")
+        self._nombre = value.strip()
 
 
 class Proveedor:
-  def __init__(self, id: int, nombre: str, contacto: str) -> None:
-    self.id = id
-    self.nombre = nombre
-    self.contacto = contacto
+    def __init__(self, id: int, nombre: str, contacto: str) -> None:
+        self.id = id
+        self.nombre = nombre
+        self.contacto = contacto
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de proveedor debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de proveedor debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def nombre(self) -> str:
-    return self._nombre
+    @property
+    def nombre(self) -> str:
+        return self._nombre
 
-  @nombre.setter
-  def nombre(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El nombre de proveedor no puede estar vacio")
-    self._nombre = value.strip()
+    @nombre.setter
+    def nombre(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El nombre de proveedor no puede estar vacio")
+        self._nombre = value.strip()
 
-  @property
-  def nombre_legal(self) -> str:
-    return self._nombre
+    @property
+    def nombre_legal(self) -> str:
+        return self._nombre
 
-  @nombre_legal.setter
-  def nombre_legal(self, value: str) -> None:
-    self.nombre = value
+    @nombre_legal.setter
+    def nombre_legal(self, value: str) -> None:
+        self.nombre = value
 
-  @property
-  def contacto(self) -> str:
-    return self._contacto
+    @property
+    def contacto(self) -> str:
+        return self._contacto
 
-  @contacto.setter
-  def contacto(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El contacto no puede estar vacio")
-    self._contacto = value.strip()
+    @contacto.setter
+    def contacto(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El contacto no puede estar vacio")
+        self._contacto = value.strip()
 
 
 class Moneda:
-  def __init__(self, id: int, nombre: str) -> None:
-    self.id = id
-    self.nombre = nombre
+    def __init__(self, id: int, nombre: str) -> None:
+        self.id = id
+        self.nombre = nombre
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de moneda debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de moneda debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def nombre(self) -> str:
-    return self._nombre
+    @property
+    def nombre(self) -> str:
+        return self._nombre
 
-  @nombre.setter
-  def nombre(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El nombre de moneda no puede estar vacio")
-    self._nombre = value.strip()
+    @nombre.setter
+    def nombre(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El nombre de moneda no puede estar vacio")
+        self._nombre = value.strip()
 
 
 class TipoCotizacion:
-  def __init__(self, id: int, nombre: str) -> None:
-    self.id = id
-    self.nombre = nombre
+    def __init__(self, id: int, nombre: str) -> None:
+        self.id = id
+        self.nombre = nombre
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de tipo cotizacion debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de tipo cotizacion debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def nombre(self) -> str:
-    return self._nombre
+    @property
+    def nombre(self) -> str:
+        return self._nombre
 
-  @nombre.setter
-  def nombre(self, value: str) -> None:
-    normalizado = _normalize_tipo_nombre(value)
-    if normalizado not in CotizacionDolar.TIPOS_VALIDOS:
-      raise ValueError(f"Tipo de cotizacion invalido: {value}")
-    self._nombre = value.strip()
+    @nombre.setter
+    def nombre(self, value: str) -> None:
+        normalizado = _normalize_tipo_nombre(value)
+
+        if normalizado not in CotizacionDolar.TIPOS_VALIDOS:
+            raise ValueError(f"Tipo de cotizacion invalido: {value}")
+
+        self._nombre = value.strip()
 
 
 class Precio:
-  _next_id = 1
+    _next_id = 1
 
-  def __init__(
-    self,
-    valor: float,
-    moneda: str | Moneda,
-    fecha: date | None = None,
-    id: int | None = None,
-  ) -> None:
-    resolved_id = id if id is not None else self._next_id
-    self.id = resolved_id
-    if id is None:
-      Precio._next_id += 1
-    elif resolved_id >= Precio._next_id:
-      Precio._next_id = resolved_id + 1
-    self.valor = valor
-    self.moneda = moneda
-    self.fecha_actualizacion = fecha or date.today()
+    def __init__(
+        self,
+        valor: float,
+        moneda: str | Moneda,
+        fecha: date | None = None,
+        id: int | None = None,
+    ) -> None:
+        resolved_id = id if id is not None else self._next_id
 
-  @property
-  def id(self) -> int:
-    return self._id
+        self.id = resolved_id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de precio debe ser mayor a cero")
-    self._id = value
+        if id is None:
+            Precio._next_id += 1
+        elif resolved_id >= Precio._next_id:
+            Precio._next_id = resolved_id + 1
 
-  @property
-  def valor(self) -> float:
-    return self._valor
+        self.valor = valor
+        self.moneda = moneda
+        self.fecha_actualizacion = fecha or date.today()
 
-  @valor.setter
-  def valor(self, value: float) -> None:
-    if value < 0:
-      raise ValueError("El valor de precio no puede ser negativo")
-    self._valor = float(value)
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @property
-  def moneda(self) -> str:
-    return self._moneda
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de precio debe ser mayor a cero")
+        self._id = value
 
-  @moneda.setter
-  def moneda(self, value: str | Moneda) -> None:
-    if isinstance(value, Moneda):
-      codigo = value.nombre.strip().upper()[:3]
-    else:
-      codigo = value.strip().upper()
-    if not codigo:
-      raise ValueError("La moneda no puede estar vacia")
-    self._moneda = codigo
+    @property
+    def valor(self) -> float:
+        return self._valor
 
-  @property
-  def fecha_actualizacion(self) -> date:
-    return self._fecha_actualizacion
+    @valor.setter
+    def valor(self, value: float) -> None:
+        if value < 0:
+            raise ValueError("El valor de precio no puede ser negativo")
+        self._valor = float(value)
 
-  @fecha_actualizacion.setter
-  def fecha_actualizacion(self, value: date) -> None:
-    self._fecha_actualizacion = value
+    @property
+    def moneda(self) -> str:
+        return self._moneda
+
+    @moneda.setter
+    def moneda(self, value: str | Moneda) -> None:
+        if isinstance(value, Moneda):
+            codigo = value.nombre.strip().upper()[:3]
+        else:
+            codigo = value.strip().upper()
+
+        if not codigo:
+            raise ValueError("La moneda no puede estar vacia")
+
+        self._moneda = codigo
+
+    @property
+    def fecha_actualizacion(self) -> date:
+        return self._fecha_actualizacion
+
+    @fecha_actualizacion.setter
+    def fecha_actualizacion(self, value: date) -> None:
+        self._fecha_actualizacion = value
 
 
 class CotizacionDolar:
-  TIPOS_VALIDOS = {
-    "OFICIAL",
-    "BLUE",
-    "BOLSA",
-    "CCL",
-    "CRIPTO",
-    "TARJETA",
-    "MAYORISTA",
-  }
+    TIPOS_VALIDOS = {
+        "OFICIAL",
+        "BLUE",
+        "BOLSA",
+        "CCL",
+        "CRIPTO",
+        "TARJETA",
+        "MAYORISTA",
+    }
 
-  _next_id = 1
+    _next_id = 1
 
-  def __init__(self, valor: float, fecha: date, tipo: str | TipoCotizacion, id: int | None = None) -> None:
-    resolved_id = id if id is not None else self._next_id
-    self.id = resolved_id
-    if id is None:
-      CotizacionDolar._next_id += 1
-    elif resolved_id >= CotizacionDolar._next_id:
-      CotizacionDolar._next_id = resolved_id + 1
-    self.valor = valor
-    self.fecha = fecha
-    self.tipo = tipo
+    def __init__(
+        self,
+        valor: float,
+        fecha: date,
+        tipo: str | TipoCotizacion,
+        id: int | None = None,
+    ) -> None:
+        resolved_id = id if id is not None else self._next_id
 
-  @property
-  def id(self) -> int:
-    return self._id
+        self.id = resolved_id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de cotizacion debe ser mayor a cero")
-    self._id = value
+        if id is None:
+            CotizacionDolar._next_id += 1
+        elif resolved_id >= CotizacionDolar._next_id:
+            CotizacionDolar._next_id = resolved_id + 1
 
-  @property
-  def valor(self) -> float:
-    return self._valor
+        self.valor = valor
+        self.fecha = fecha
+        self.tipo = tipo
 
-  @valor.setter
-  def valor(self, value: float) -> None:
-    if value <= 0:
-      raise ValueError("La cotizacion debe ser positiva")
-    self._valor = float(value)
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @property
-  def fecha(self) -> date:
-    return self._fecha
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de cotizacion debe ser mayor a cero")
+        self._id = value
 
-  @fecha.setter
-  def fecha(self, value: date) -> None:
-    self._fecha = value
+    @property
+    def valor(self) -> float:
+        return self._valor
 
-  @property
-  def tipo(self) -> str:
-    return self._tipo
+    @valor.setter
+    def valor(self, value: float) -> None:
+        if value <= 0:
+            raise ValueError("La cotizacion debe ser positiva")
+        self._valor = float(value)
 
-  @tipo.setter
-  def tipo(self, value: str | TipoCotizacion) -> None:
-    raw = value.nombre if isinstance(value, TipoCotizacion) else value
-    normalizado = _normalize_tipo_nombre(raw)
-    if normalizado not in self.TIPOS_VALIDOS:
-      raise ValueError(f"Tipo de cotizacion invalido: {value}")
-    self._tipo = normalizado
+    @property
+    def fecha(self) -> date:
+        return self._fecha
+
+    @fecha.setter
+    def fecha(self, value: date) -> None:
+        self._fecha = value
+
+    @property
+    def tipo(self) -> str:
+        return self._tipo
+
+    @tipo.setter
+    def tipo(self, value: str | TipoCotizacion) -> None:
+        raw = value.nombre if isinstance(value, TipoCotizacion) else value
+        normalizado = _normalize_tipo_nombre(raw)
+
+        if normalizado not in self.TIPOS_VALIDOS:
+            raise ValueError(f"Tipo de cotizacion invalido: {value}")
+
+        self._tipo = normalizado
 
 
 class Producto:
-  def __init__(
-    self,
-    id: int,
-    nombre: str,
-    descripcion: str,
-    precio: Precio,
-    categoria: Categoria,
-    proveedor: Proveedor,
-  ) -> None:
-    self.id = id
-    self.nombre = nombre
-    self.descripcion = descripcion
-    self.precio = precio
-    self.categoria = categoria
-    self.proveedor = proveedor
+    def __init__(
+        self,
+        id: int,
+        nombre: str,
+        descripcion: str,
+        precio: Precio,
+        categoria: Categoria,
+        proveedor: Proveedor,
+    ) -> None:
+        self.id = id
+        self.nombre = nombre
+        self.descripcion = descripcion
+        self.precio = precio
+        self.categoria = categoria
+        self.proveedor = proveedor
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de producto debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de producto debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def nombre(self) -> str:
-    return self._nombre
+    @property
+    def nombre(self) -> str:
+        return self._nombre
 
-  @nombre.setter
-  def nombre(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El nombre de producto no puede estar vacio")
-    self._nombre = value.strip()
+    @nombre.setter
+    def nombre(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El nombre de producto no puede estar vacio")
+        self._nombre = value.strip()
 
-  @property
-  def descripcion(self) -> str:
-    return self._descripcion
+    @property
+    def descripcion(self) -> str:
+        return self._descripcion
 
-  @descripcion.setter
-  def descripcion(self, value: str) -> None:
-    self._descripcion = value.strip()
+    @descripcion.setter
+    def descripcion(self, value: str) -> None:
+        self._descripcion = value.strip()
+
+    @property
+    def precio(self) -> Precio:
+        return self._precio
+
+    @precio.setter
+    def precio(self, value: Precio) -> None:
+        if not isinstance(value, Precio):
+            raise TypeError("El precio debe ser una instancia de Precio")
+        self._precio = value
+
+    @property
+    def categoria(self) -> Categoria:
+        return self._categoria
+
+    @categoria.setter
+    def categoria(self, value: Categoria) -> None:
+        if not isinstance(value, Categoria):
+            raise TypeError("La categoria debe ser una instancia de Categoria")
+        self._categoria = value
+
+    @property
+    def proveedor(self) -> Proveedor:
+        return self._proveedor
+
+    @proveedor.setter
+    def proveedor(self, value: Proveedor) -> None:
+        if not isinstance(value, Proveedor):
+            raise TypeError("El proveedor debe ser una instancia de Proveedor")
+        self._proveedor = value
 
 
 class Stock:
-  def __init__(self, id: int, producto: Producto, almacen: str, cantidad: int) -> None:
-    self.id = id
-    self.producto = producto
-    self.almacen = almacen
-    self.cantidad = cantidad
+    def __init__(
+        self,
+        id: int,
+        producto: Producto,
+        almacen: str,
+        cantidad: int,
+    ) -> None:
+        self.id = id
+        self.producto = producto
+        self.almacen = almacen
+        self.cantidad = cantidad
 
-  @property
-  def id(self) -> int:
-    return self._id
+    @property
+    def id(self) -> int:
+        return self._id
 
-  @id.setter
-  def id(self, value: int) -> None:
-    if value <= 0:
-      raise ValueError("El id de stock debe ser mayor a cero")
-    self._id = value
+    @id.setter
+    def id(self, value: int) -> None:
+        if value <= 0:
+            raise ValueError("El id de stock debe ser mayor a cero")
+        self._id = value
 
-  @property
-  def almacen(self) -> str:
-    return self._almacen
+    @property
+    def producto(self) -> Producto:
+        return self._producto
 
-  @almacen.setter
-  def almacen(self, value: str) -> None:
-    if not value.strip():
-      raise ValueError("El almacen no puede estar vacio")
-    self._almacen = value.strip()
+    @producto.setter
+    def producto(self, value: Producto) -> None:
+        if not isinstance(value, Producto):
+            raise TypeError("El producto debe ser una instancia de Producto")
+        self._producto = value
 
-  @property
-  def cantidad(self) -> int:
-    return self._cantidad
+    @property
+    def almacen(self) -> str:
+        return self._almacen
 
-  @cantidad.setter
-  def cantidad(self, value: int) -> None:
-    if value < 0:
-      raise ValueError("La cantidad no puede ser negativa")
-    self._cantidad = int(value)
+    @almacen.setter
+    def almacen(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("El almacen no puede estar vacio")
+        self._almacen = value.strip()
+
+    @property
+    def cantidad(self) -> int:
+        return self._cantidad
+
+    @cantidad.setter
+    def cantidad(self, value: int) -> None:
+        if value < 0:
+            raise ValueError("La cantidad no puede ser negativa")
+        self._cantidad = int(value)

@@ -1,90 +1,92 @@
-# Trabajo Practico 1 de Seminario de Actualizacion - UGR
-# Price Manager - Star Computación
+# Trabajo Practico 1 - Seminario de Actualizacion
+# Price Manager - Star Computacion
 
-## 📌 Sprint 1
+Aplicacion de consola (CLI) en Python para gestionar inventario, precios, stock y cotizaciones de dolar para un local de hardware.
 
----
+## Estado del proyecto
 
-## 🎯 Objetivo
+- Sprint actual: Sprint 2.
+- Persistencia principal: base de datos SQLite mediante SQLAlchemy.
+- Integracion online: cotizaciones desde API configurable por `.env`.
 
-El objetivo principal de este proyecto es aplicar los conocimientos adquiridos en Programación Orientada a Objetos (POO), manejo de archivos para persistencia de datos y control de versiones mediante Git.
+## Funcionalidades principales
 
-Se busca desarrollar una aplicación de consola (CLI) en Python que permita gestionar el inventario de un local de hardware, integrando funcionalidades de actualización de precios en tiempo real basadas en la cotización del dólar.
+- CRUD de productos, precios, categorias y proveedores.
+- Gestion de stock.
+- Gestion de cotizaciones:
+  - alta/actualizacion manual,
+  - actualizacion en tiempo real,
+  - carga masiva desde API.
+- Recotizacion de productos segun tipo de dolar.
+- Vista bimonetaria (ARS/USD).
+- Exportacion de precios a CSV por tipo de cotizacion.
+- Comparacion de precios con competencia web.
 
----
+## Estructura relevante
 
-## 📖 Introducción y Contexto
+- `src/price_manager/main.py`: punto de entrada.
+- `src/price_manager/database/connection.py`: conexion y transacciones SQLAlchemy.
+- `src/price_manager/models/models.py`: modelos ORM.
+- `src/price_manager/repositories/repositories.py`: acceso a datos.
+- `src/price_manager/services/services.py`: logica de negocio e integraciones.
+- `src/price_manager/ui/console.py`: interfaz CLI.
+- `src/price_manager/migrations/migrations.py`: migracion CSV -> DB y generacion SQL.
 
-Una empresa distribuidora de productos electrónicos necesita modernizar su sistema de gestión de inventarios. Debido a la volatilidad económica, resulta fundamental contar con un sistema que permita:
+## Requisitos
 
-- Gestionar precios en diferentes monedas.
-- Registrar y actualizar cotizaciones del dólar.
-- Mantener un control preciso del stock de productos.
-- Comparar precios con fuentes externas.
+- Python 3.10 o superior.
+- Dependencias de `requirements.txt`:
+  - `SQLAlchemy`
+  - `python-dotenv`
 
-En este primer sprint se sientan las bases del sistema, definiendo las entidades principales y comenzando con la implementación de la lógica del negocio mediante Programación Orientada a Objetos.
+## Instalacion
 
----
+1. Crear entorno virtual (opcional pero recomendado):
+   - Windows (PowerShell):
+     ```bash
+     python -m venv .venv
+     .\\.venv\\Scripts\\Activate.ps1
+     ```
+2. Instalar dependencias:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## 🧩 Alcance del Sprint 1
+## Configuracion
 
-En esta etapa inicial se abordan:
+Crear archivo `.env` en la raiz del proyecto con:
 
-- Definición de entidades principales:
-  - Categoría
-  - Proveedor
-  - Producto
-  - Precio
-  - CotizaciónDolar
-  - Stock
+```env
+API_URL=https://dolarapi.com/v1/dolares
+```
 
-- Implementación de:
-  - Clases con encapsulamiento
-  - Relaciones entre objetos
-  - CRUD básico por entidad
-  - Persistencia de datos en archivos
+`API_URL` es obligatoria para funciones de cotizacion online.  
+Si falta, la app informa el error en la interfaz y solo se bloquean esas funciones.
 
-- Organización del proyecto:
-  - Estructuración del código en módulos
-  - Uso de notebooks con celdas organizadas
-  - Preparación del entorno de trabajo con Git
+## Ejecucion
 
----
+Desde la raiz del repo:
 
-## 🛠️ Tecnologías utilizadas
+```bash
+python src/price_manager/main.py
+```
 
-- Python 🐍
-- Google Colab
-- Git & GitHub
+Al iniciar, `main.py` ejecuta migracion inicial de CSV a base de datos y luego abre la consola interactiva.
 
----
+## Datos y archivos generados
 
-## 👥 Integrantes
+- Base SQLite: `price_manager.db`.
+- SQL de migracion: `src/price_manager/migrations/sql/*.sql` (generados automaticamente).
+- CSV de exportacion: `src/price_manager/migrations/csv/export_precios/*.csv`.
 
-- Gonzalez, Rodrigo  
-- Miranda, Facundo  
-- Golin, Lucia  
-- Berti, Juan Ignacio  
-- Guaimas Rosado, Cesar Gabriel  
+## Integrantes
 
----
+- Gonzalez, Rodrigo
+- Miranda, Facundo
+- Golin, Lucia
+- Berti, Juan Ignacio
+- Guaimas Rosado, Cesar Gabriel
 
-## 🔄 Metodología de trabajo
+## Historial de cambios
 
-El desarrollo se realiza bajo una metodología incremental basada en sprints, simulando un entorno de trabajo colaborativo real.
-
-Se utilizan buenas prácticas como:
-
-- Control de versiones con Git
-- Registro de cambios mediante CHANGELOG.md
-- Código modular y reutilizable
-- Aplicación de estándares PEP8
-
----
-
-## 📌 Estado actual
-
-🔹 Sprint 1 en desarrollo  
-🔹 Definición de estructura y entidades del sistema  
-
----
+Ver `CHANGELOG.md` para el detalle por sprint y por dia.

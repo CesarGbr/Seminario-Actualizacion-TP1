@@ -1,1 +1,6 @@
-CHANGELOG.md
+# CHANGELOG.md
+price_manager.db
+src/price_manager/migrations/sql/*.sql
+src/price_manager/migrations/csv/export_precios/*.csv
+.env
+*.ipynb

@@ -10,6 +10,7 @@ from pathlib import Path
 from price_manager.entities.entities import Precio
 from price_manager.entities.entities import Categoria, CotizacionDolar, Producto, Proveedor
 from price_manager.services.services import (
+    ConfiguracionRequeridaError,
     ServicioCompetenciaWeb,
     ServicioCategoria,
     ServicioCotizacionDolar,
@@ -96,12 +97,19 @@ class PriceManagerConsole:
                     break
                 else:
                     print("Opcion invalida")
+            except ConfiguracionRequeridaError as exc:
+                self._mostrar_error_configuracion(exc)
             except ValueError as exc:
                 print(f"Error de validacion: {exc}")
             except RuntimeError as exc:
                 print(f"Error de integracion: {exc}")
             except Exception as exc:
                 print(f"Error inesperado: {exc}")
+
+    @staticmethod
+    def _mostrar_error_configuracion(exc: ConfiguracionRequeridaError) -> None:
+        print(f"Configuracion faltante: {exc}")
+        print("Completa API_URL en .env para habilitar esa funcionalidad.")
 
     def _verificar_cotizacion_inicial(self) -> None:
         """Chequeo al iniciar: garantiza decision explicita sobre cotizacion del dia."""
@@ -136,6 +144,8 @@ class PriceManagerConsole:
                 f"Cotizacion inicial actualizada: {cotizacion.tipo} = "
                 f"{cotizacion.valor:.2f} ({cotizacion.fecha.isoformat()})"
             )
+        except ConfiguracionRequeridaError as exc:
+            self._mostrar_error_configuracion(exc)
         except RuntimeError as exc:
             print(f"No se pudo actualizar cotizacion inicial: {exc}")
 

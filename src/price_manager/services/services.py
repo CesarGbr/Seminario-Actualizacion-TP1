@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from datetime import date
-import json
 import html
+import json
+import os
+from pathlib import Path
+import re
 import time
 import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-import re
 from difflib import SequenceMatcher
+from typing import Any
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*_args: object, **_kwargs: object) -> bool:
+        return False
 
 from price_manager.entities.entities import (
     Categoria,
@@ -34,6 +43,81 @@ from price_manager.repositories.repositories import (
     RepositorioStock,
     RepositorioTipoCotizacion,
 )
+
+
+class ConfiguracionRequeridaError(RuntimeError):
+    """Error de configuracion para integraciones opcionales."""
+
+
+_DOTENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=_DOTENV_PATH)
+
+
+def _get_api_url() -> str:
+    configured = (os.getenv("API_URL") or "").strip()
+    if not configured:
+        raise ConfiguracionRequeridaError(
+            "Falta API_URL en .env para usar cotizaciones online."
+        )
+    return configured
+
+
+def _parse_float(value: object) -> float | None:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value = value.strip().replace(",", ".")
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _read_json_url(url: str) -> Any:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "PriceManagerCLI/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _fetch_dolares_payload() -> list[dict[str, Any]]:
+    try:
+        payload = _read_json_url(_get_api_url())
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RuntimeError("No se pudo consultar cotizacion online") from exc
+
+    if not isinstance(payload, list):
+        raise RuntimeError("Respuesta invalida de API de cotizaciones")
+
+    resultado = [item for item in payload if isinstance(item, dict)]
+    if not resultado:
+        raise RuntimeError("La API no devolvio cotizaciones")
+
+    return resultado
+
+
+def _fecha_desde_payload(row: dict[str, Any]) -> date:
+    raw = str(row.get("fechaActualizacion") or row.get("fecha") or "").strip()
+    if not raw:
+        return date.today()
+
+    candidate = raw.replace("Z", "+00:00")
+    if "T" in candidate:
+        candidate = candidate.split("T", 1)[0]
+    else:
+        candidate = candidate[:10]
+
+    try:
+        return date.fromisoformat(candidate)
+    except ValueError:
+        return date.today()
 
 
 def _normalizar_tipo(value: str) -> str:
@@ -63,19 +147,10 @@ def _normalizar_tipo(value: str) -> str:
 def _fetch_dolar_rate(tipo: str) -> float:
     """Obtiene cotizacion desde API publica en tiempo real."""
     normalized = _normalizar_tipo(tipo)
-    url = "https://dolarapi.com/v1/dolares"
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "PriceManagerCLI/1.0",
-            "Accept": "application/json",
-        },
-    )
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-        payload = None
+        payload = _fetch_dolares_payload()
+    except RuntimeError:
+        payload = []
 
     by_tipo = {
         "OFICIAL": {"oficial"},
@@ -87,35 +162,26 @@ def _fetch_dolar_rate(tipo: str) -> float:
         "MAYORISTA": {"mayorista"},
     }
     candidates = by_tipo.get(normalized, {normalized.lower()})
-    if isinstance(payload, list):
-        for row in payload:
-            casa = str(row.get("casa", "")).lower().replace(" ", "")
-            nombre = str(row.get("nombre", "")).lower().replace(" ", "")
-            if any(
-                candidate in casa or candidate in nombre for candidate in candidates
-            ):
-                value = row.get("venta") or row.get("promedio")
-                if value is None:
-                    continue
-                return float(value)
+    for row in payload:
+        casa = str(row.get("casa", "")).lower().replace(" ", "")
+        nombre = str(row.get("nombre", "")).lower().replace(" ", "")
+        if any(candidate in casa or candidate in nombre for candidate in candidates):
+            value = _parse_float(row.get("venta") or row.get("promedio"))
+            if value is None:
+                continue
+            return value
 
     # Fallback por endpoint especifico por tipo (mas estable en algunos entornos).
     casa = next(iter(candidates))
-    fallback_url = f"https://dolarapi.com/v1/dolares/{casa}"
-    fallback_request = urllib.request.Request(
-        fallback_url,
-        headers={
-            "User-Agent": "PriceManagerCLI/1.0",
-            "Accept": "application/json",
-        },
-    )
+    fallback_url = f"{_get_api_url().rstrip('/')}/{casa}"
     try:
-        with urllib.request.urlopen(fallback_request, timeout=10) as response:
-            row = json.loads(response.read().decode("utf-8"))
-            value = row.get("venta") or row.get("promedio")
-            if value is None:
-                raise RuntimeError("Respuesta sin campo de cotizacion")
-            return float(value)
+        row = _read_json_url(fallback_url)
+        if not isinstance(row, dict):
+            raise RuntimeError("Respuesta sin estructura valida")
+        value = _parse_float(row.get("venta") or row.get("promedio"))
+        if value is None:
+            raise RuntimeError("Respuesta sin campo de cotizacion")
+        return value
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise RuntimeError("No se pudo consultar cotizacion online") from exc
 
@@ -494,17 +560,72 @@ class ServicioCotizacionDolar:
             return None
         return historico[-1]
 
+    def _siguiente_id_cotizacion(self) -> int:
+        return max((item.id for item in self._repo.leer_todos()), default=0) + 1
+
+    def obtener_cotizaciones(self) -> list[CotizacionDolar]:
+        """Descarga cotizaciones desde API_URL y las registra en base de datos."""
+        payload = _fetch_dolares_payload()
+        registradas: list[CotizacionDolar] = []
+        siguiente_id = self._siguiente_id_cotizacion()
+
+        for row in payload:
+            tipo_raw = str(row.get("nombre") or row.get("casa") or "").strip()
+            if not tipo_raw:
+                continue
+
+            tipo = _normalizar_tipo(tipo_raw)
+            if tipo not in CotizacionDolar.TIPOS_VALIDOS:
+                continue
+
+            valor = _parse_float(row.get("venta") or row.get("promedio"))
+            if valor is None or valor <= 0:
+                continue
+
+            fecha_cotizacion = _fecha_desde_payload(row)
+            existente = self.buscar_por_tipo_y_fecha(tipo, fecha_cotizacion)
+
+            if existente is None:
+                cotizacion = self.crear(
+                    CotizacionDolar(
+                        id=siguiente_id,
+                        valor=valor,
+                        fecha=fecha_cotizacion,
+                        tipo=tipo,
+                    )
+                )
+                siguiente_id += 1
+            else:
+                existente.valor = valor
+                cotizacion = self.actualizar(existente)
+
+            registradas.append(cotizacion)
+
+        if not registradas:
+            raise RuntimeError("No se obtuvieron cotizaciones validas desde la API")
+
+        return registradas
+
     def actualizar_cotizacion_tiempo_real(
         self, tipo: str = "OFICIAL"
     ) -> CotizacionDolar:
         valor = _fetch_dolar_rate(tipo)
-        return self.crear(
-            CotizacionDolar(
-                valor=valor,
-                fecha=date.today(),
-                tipo=_normalizar_tipo(tipo),
+        tipo_normalizado = _normalizar_tipo(tipo)
+        fecha_hoy = date.today()
+        existente = self.buscar_por_tipo_y_fecha(tipo_normalizado, fecha_hoy)
+
+        if existente is None:
+            return self.crear(
+                CotizacionDolar(
+                    id=self._siguiente_id_cotizacion(),
+                    valor=valor,
+                    fecha=fecha_hoy,
+                    tipo=tipo_normalizado,
+                )
             )
-        )
+
+        existente.valor = valor
+        return self.actualizar(existente)
 
     def actualizar(self, cotizacion: CotizacionDolar) -> CotizacionDolar:
         return self._repo.actualizar(cotizacion)

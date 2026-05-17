@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import csv
 from difflib import get_close_matches
 from datetime import date
+from pathlib import Path
 
 from price_manager.entities.entities import Precio
-from price_manager.entities.entities import Categoria, Producto, Proveedor
+from price_manager.entities.entities import Categoria, CotizacionDolar, Producto, Proveedor
 from price_manager.services.services import (
     ServicioCompetenciaWeb,
     ServicioCategoria,
@@ -54,6 +56,9 @@ class PriceManagerConsole:
             print("9. Gestion de catalogos")
             print("10. Gestion de cotizaciones")
             print("11. Recotizar productos segun dolar")
+            print("12. Obtener cotizaciones por API")
+            print("13. Ver lista de precios bimonetaria")
+            print("14. Exportar precios a CSV (todos los tipos de moneda)")
             print("0. Salir")
 
             opcion = input("Seleccione opcion: ").strip()
@@ -80,6 +85,12 @@ class PriceManagerConsole:
                     self._menu_cotizaciones()
                 elif opcion == "11":
                     self._recotizar_productos_por_dolar()
+                elif opcion == "12":
+                    self._obtener_cotizaciones_por_api()
+                elif opcion == "13":
+                    self._ver_precios_bimonetarios()
+                elif opcion == "14":
+                    self._exportar_precios_csv_todos_tipos()
                 elif opcion == "0":
                     print("Saliendo...")
                     break
@@ -635,6 +646,158 @@ class PriceManagerConsole:
             usd = valor / cotizacion_ars_usd
             return f"{valor:.2f} ARS | {usd:.2f} USD"
         return f"{valor:.2f} {moneda_norm}"
+
+    def _precio_en_ars_y_usd(
+        self, valor: float, moneda: str, cotizacion_ars_usd: float
+    ) -> tuple[float, float]:
+        moneda_norm = (moneda or "").strip().upper()
+        if moneda_norm == "USD":
+            return valor * cotizacion_ars_usd, valor
+        if moneda_norm == "ARS":
+            return valor, valor / cotizacion_ars_usd
+        raise ValueError(f"Moneda no soportada para conversion: {moneda_norm}")
+
+    def _obtener_ultimas_cotizaciones(self) -> dict[str, CotizacionDolar]:
+        cotizaciones = self._servicio_cotizacion.listar_todos()
+        ultimas: dict[str, CotizacionDolar] = {}
+        for cotizacion in cotizaciones:
+            actual = ultimas.get(cotizacion.tipo)
+            if actual is None or (cotizacion.fecha, cotizacion.id) > (
+                actual.fecha,
+                actual.id,
+            ):
+                ultimas[cotizacion.tipo] = cotizacion
+        return dict(sorted(ultimas.items(), key=lambda item: item[0]))
+
+    def _obtener_cotizaciones_por_api(self) -> None:
+        cotizaciones = self._servicio_cotizacion.obtener_cotizaciones()
+        if not cotizaciones:
+            print("No se registraron cotizaciones desde la API.")
+            return
+        print(f"Se registraron/actualizaron {len(cotizaciones)} cotizaciones.")
+        for cotizacion in sorted(
+            cotizaciones,
+            key=lambda item: (item.fecha, item.tipo, item.id),
+        ):
+            print(
+                f"ID {cotizacion.id} | {cotizacion.tipo} | "
+                f"{cotizacion.fecha.isoformat()} | {cotizacion.valor:.2f}"
+            )
+
+    def _ver_precios_bimonetarios(self) -> None:
+        productos = self._servicio_producto.listar_todos()
+        if not productos:
+            print("No hay productos cargados")
+            return
+
+        ultimas = self._obtener_ultimas_cotizaciones()
+        if not ultimas:
+            print("No hay cotizaciones cargadas. Primero obtenelas por API.")
+            return
+
+        opciones = list(ultimas.values())
+        print("\nTipo de cotizacion para vista bimonetaria:")
+        for idx, cotizacion in enumerate(opciones, start=1):
+            print(
+                f"{idx}. {cotizacion.tipo} | {cotizacion.valor:.2f} "
+                f"({cotizacion.fecha.isoformat()})"
+            )
+
+        indice = self._read_int("Indice tipo (o 'b' para volver): ", allow_back=True)
+        if indice is None:
+            return
+        if not 1 <= indice <= len(opciones):
+            print("Indice fuera de rango.")
+            return
+
+        seleccionada = opciones[indice - 1]
+        if seleccionada.valor <= 0:
+            print("La cotizacion seleccionada es invalida.")
+            return
+
+        print(
+            f"\nLista bimonetaria usando {seleccionada.tipo} "
+            f"({seleccionada.valor:.2f} ARS/USD)"
+        )
+        for producto in sorted(productos, key=lambda item: item.id):
+            ars, usd = self._precio_en_ars_y_usd(
+                producto.precio.valor,
+                producto.precio.moneda,
+                seleccionada.valor,
+            )
+            print(
+                f"ID {producto.id} | {producto.nombre} | "
+                f"ARS {ars:.2f} | USD {usd:.2f} ({seleccionada.tipo})"
+            )
+
+    def _exportar_precios_csv_todos_tipos(self) -> None:
+        productos = self._servicio_producto.listar_todos()
+        if not productos:
+            print("No hay productos para exportar.")
+            return
+
+        ultimas = self._obtener_ultimas_cotizaciones()
+        if not ultimas:
+            print("No hay cotizaciones cargadas. Primero obtenelas por API.")
+            return
+
+        output_dir = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "csv"
+            / "export_precios"
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        fieldnames = [
+            "producto_id",
+            "producto_nombre",
+            "moneda_origen",
+            "precio_origen",
+            "tipo_cotizacion",
+            "fecha_cotizacion",
+            "cotizacion_ars_usd",
+            "precio_ars",
+            "precio_usd",
+        ]
+
+        archivos_generados: list[Path] = []
+        for cotizacion in ultimas.values():
+            if cotizacion.valor <= 0:
+                continue
+
+            file_path = output_dir / f"precios_{cotizacion.tipo.lower()}.csv"
+            with file_path.open("w", encoding="utf-8", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                for producto in sorted(productos, key=lambda item: item.id):
+                    ars, usd = self._precio_en_ars_y_usd(
+                        producto.precio.valor,
+                        producto.precio.moneda,
+                        cotizacion.valor,
+                    )
+                    writer.writerow(
+                        {
+                            "producto_id": producto.id,
+                            "producto_nombre": producto.nombre,
+                            "moneda_origen": producto.precio.moneda,
+                            "precio_origen": f"{producto.precio.valor:.4f}",
+                            "tipo_cotizacion": cotizacion.tipo,
+                            "fecha_cotizacion": cotizacion.fecha.isoformat(),
+                            "cotizacion_ars_usd": f"{cotizacion.valor:.4f}",
+                            "precio_ars": f"{ars:.4f}",
+                            "precio_usd": f"{usd:.4f}",
+                        }
+                    )
+            archivos_generados.append(file_path)
+
+        if not archivos_generados:
+            print("No se genero ningun archivo CSV por falta de cotizaciones validas.")
+            return
+
+        print("Exportacion completada. Archivos generados:")
+        for file_path in archivos_generados:
+            print(f"- {file_path}")
 
     def _eliminar_producto(self) -> None:
         producto = self._seleccionar_producto()

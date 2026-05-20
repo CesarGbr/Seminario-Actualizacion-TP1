@@ -48,8 +48,15 @@ from price_manager.repositories.repositories import (
 class ConfiguracionRequeridaError(RuntimeError):
     """Error de configuracion para integraciones opcionales."""
 
+# Compatibilidad entre ejecución tradicional (VSCode/scripts)
+# y entornos notebook como Google Colab/Jupyter, donde __file__
+# puede no estar definido.
+try:
+    BASE_PATH = Path(__file__).resolve().parents[3]
+except NameError:
+    BASE_PATH = Path("/content/Seminario-Actualizacion-TP1")
 
-_DOTENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+_DOTENV_PATH = BASE_PATH / ".env"
 load_dotenv(dotenv_path=_DOTENV_PATH)
 
 

@@ -334,6 +334,23 @@ Todas las modificaciones relevantes de este proyecto se documentan aqui.
 - Incorporacion de error de configuracion explicito (`ConfiguracionRequeridaError`) cuando falta `API_URL`.
 
 ### Agregado
+
+---
+
+---
+
+## [Sprint 2] - Dia 9
+
+### Correcciones
+- Ajuste en `src/price_manager/services/services.py` para resolver correctamente la ruta del archivo `.env` tanto en ejecucion local como en Google Colab/Jupyter.
+- Incorporacion de fallback para entornos donde `__file__` no esta definido.
+
+### Cambios
+- Mejora de compatibilidad entre Visual Studio Code y Google Colab.
+- Validacion de carga de `API_URL` desde `.env` en ambos entornos.
+
+### Detalles
+- El cambio evita errores al ejecutar o importar `services.py` desde notebooks, manteniendo el comportamiento original en ejecucion local.
 - Manejo especifico en `src/price_manager/ui/console.py` para mostrar aviso claro al usuario cuando falta `API_URL` en `.env`.
 
 ### Correcciones

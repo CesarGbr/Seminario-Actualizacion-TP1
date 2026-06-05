@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 
 from price_manager.database.connection import ConexionDB
 from price_manager.models.models import (
@@ -72,6 +72,64 @@ def _catalogo_con_ids(valores: list[str]) -> tuple[list[dict[str, Any]], dict[st
         mapping[normalizado] = nuevo_id
         rows.append({"id": nuevo_id, "nombre": normalizado})
     return rows, mapping
+
+
+def _orden_archivos_sql() -> tuple[str, ...]:
+    return (
+        "categorias.sql",
+        "proveedores.sql",
+        "monedas.sql",
+        "tipos_cotizacion.sql",
+        "precios.sql",
+        "cotizaciones_dolar.sql",
+        "productos.sql",
+        "stock.sql",
+    )
+
+
+def cargar_datos_desde_sql(carpeta_sqls: str) -> None:
+    """Carga la base de datos a partir de archivos SQL de insercion."""
+    carpeta_sql = Path(carpeta_sqls)
+
+    if not carpeta_sql.exists() or not carpeta_sql.is_dir():
+        raise FileNotFoundError(
+            f"La carpeta de SQL no existe o no es valida: {carpeta_sql}"
+        )
+
+    archivos_requeridos = _orden_archivos_sql()
+    faltantes = [
+        file_name
+        for file_name in archivos_requeridos
+        if not (carpeta_sql / file_name).exists()
+    ]
+    if faltantes:
+        listado = ", ".join(faltantes)
+        raise FileNotFoundError(f"Faltan archivos SQL requeridos: {listado}")
+
+    conexion = ConexionDB()
+    try:
+        crear_tablas(conexion.engine)
+
+        with conexion.transaccion() as sesion:
+            sesion.execute(delete(StockModel))
+            sesion.execute(delete(ProductoModel))
+            sesion.execute(delete(CotizacionDolarModel))
+            sesion.execute(delete(PrecioModel))
+            sesion.execute(delete(TipoCotizacionModel))
+            sesion.execute(delete(MonedaModel))
+            sesion.execute(delete(ProveedorModel))
+            sesion.execute(delete(CategoriaModel))
+
+            for file_name in archivos_requeridos:
+                script = (carpeta_sql / file_name).read_text(encoding="utf-8").strip()
+                if not script:
+                    continue
+                for statement in script.split(";"):
+                    sentencia = statement.strip()
+                    if sentencia:
+                        sesion.execute(text(sentencia))
+    finally:
+        conexion.cerrar()
 
 
 def migrar_datos(carpeta_csvs: str, carpeta_sqls: str) -> None:
@@ -174,41 +232,17 @@ def migrar_datos(carpeta_csvs: str, carpeta_sqls: str) -> None:
     ]
 
     sql_por_archivo: list[tuple[str, list[str]]] = [
-        (
-            "categorias.sql",
-            [_to_insert_sql("categorias", row) for row in categorias_rows],
-        ),
-        (
-            "proveedores.sql",
-            [_to_insert_sql("proveedores", row) for row in proveedores_rows],
-        ),
-        (
-            "monedas.sql",
-            [_to_insert_sql("monedas", row) for row in monedas_rows],
-        ),
-        (
-            "tipos_cotizacion.sql",
-            [_to_insert_sql("tipos_cotizacion", row) for row in tipos_rows],
-        ),
-        (
-            "precios.sql",
-            [_to_insert_sql("precios", row) for row in precios_rows],
-        ),
+        ("categorias.sql", [_to_insert_sql("categorias", row) for row in categorias_rows]),
+        ("proveedores.sql", [_to_insert_sql("proveedores", row) for row in proveedores_rows]),
+        ("monedas.sql", [_to_insert_sql("monedas", row) for row in monedas_rows]),
+        ("tipos_cotizacion.sql", [_to_insert_sql("tipos_cotizacion", row) for row in tipos_rows]),
+        ("precios.sql", [_to_insert_sql("precios", row) for row in precios_rows]),
         (
             "cotizaciones_dolar.sql",
-            [
-                _to_insert_sql("cotizaciones_dolar", row)
-                for row in cotizaciones_rows
-            ],
+            [_to_insert_sql("cotizaciones_dolar", row) for row in cotizaciones_rows],
         ),
-        (
-            "productos.sql",
-            [_to_insert_sql("productos", row) for row in productos_rows],
-        ),
-        (
-            "stock.sql",
-            [_to_insert_sql("stock", row) for row in stock_rows],
-        ),
+        ("productos.sql", [_to_insert_sql("productos", row) for row in productos_rows]),
+        ("stock.sql", [_to_insert_sql("stock", row) for row in stock_rows]),
     ]
 
     conexion = ConexionDB()

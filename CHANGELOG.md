@@ -338,3 +338,17 @@ Todas las modificaciones relevantes de este proyecto se documentan aqui.
 
 ### Correcciones
 - Aislamiento del fallo de configuracion: si falta `API_URL`, solo se bloquean funciones que dependen de cotizacion online y el resto del sistema sigue operativo.
+
+---
+
+## [Sprint 3] - Dia 1
+
+### Agregado
+- Nueva funcion `cargar_datos_desde_sql()` en `src/price_manager/migrations/migrations.py` para cargar la base de datos a partir de archivos `.sql`.
+
+### Cambios
+- Ajuste de la estructura del proyecto para alinearla con la organizacion objetivo bajo `src/price_manager/`.
+- Creacion del directorio `src/price_manager/scraper/` como base para la futura estructura del scraper.
+
+### Correcciones
+- Eliminacion de `src/price_manager/price_manager.db` para evitar duplicacion con la base SQLite principal ubicada en la raiz del proyecto.

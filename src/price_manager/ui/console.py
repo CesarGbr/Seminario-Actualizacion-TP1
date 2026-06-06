@@ -11,6 +11,7 @@ from price_manager.entities.entities import Precio
 from price_manager.entities.entities import Categoria, CotizacionDolar, Producto, Proveedor
 from price_manager.services.services import (
     ConfiguracionRequeridaError,
+    ServicioAuditoria,
     ServicioCompetenciaWeb,
     ServicioCategoria,
     ServicioCotizacionDolar,
@@ -31,6 +32,7 @@ class PriceManagerConsole:
         servicio_precio: ServicioPrecio,
         servicio_cotizacion: ServicioCotizacionDolar,
         servicio_competencia: ServicioCompetenciaWeb,
+        servicio_auditoria: ServicioAuditoria,
         servicio_categoria: ServicioCategoria,
         servicio_proveedor: ServicioProveedor,
     ) -> None:
@@ -39,8 +41,11 @@ class PriceManagerConsole:
         self._servicio_precio = servicio_precio
         self._servicio_cotizacion = servicio_cotizacion
         self._servicio_competencia = servicio_competencia
+        self._servicio_auditoria = servicio_auditoria
         self._servicio_categoria = servicio_categoria
         self._servicio_proveedor = servicio_proveedor
+        self._ultimo_resultado_scraping: list[dict[str, object]] = []
+        self._ultima_fecha_extraccion: str = ""
 
     def run(self) -> None:
         self._verificar_cotizacion_inicial()
@@ -60,6 +65,9 @@ class PriceManagerConsole:
             print("12. Obtener cotizaciones por API")
             print("13. Ver lista de precios bimonetaria")
             print("14. Exportar precios a CSV (todos los tipos de moneda)")
+            print("15. Ejecutar scraping")
+            print("16. Generar reporte")
+            print("17. Ver historial de auditoria")
             print("0. Salir")
 
             opcion = input("Seleccione opcion: ").strip()
@@ -79,7 +87,7 @@ class PriceManagerConsole:
                 elif opcion == "6":
                     self._actualizar_cotizacion_tiempo_real()
                 elif opcion == "7":
-                    self._menu_scraper_competencia()
+                    self._comparar_competencia()
                 elif opcion == "9":
                     self._menu_catalogos()
                 elif opcion == "10":
@@ -92,6 +100,12 @@ class PriceManagerConsole:
                     self._ver_precios_bimonetarios()
                 elif opcion == "14":
                     self._exportar_precios_csv_todos_tipos()
+                elif opcion == "15":
+                    self._ejecutar_scraper_alertas()
+                elif opcion == "16":
+                    self._generar_reporte_scraping()
+                elif opcion == "17":
+                    self._ver_historial_auditoria()
                 elif opcion == "0":
                     print("Saliendo...")
                     break
@@ -569,23 +583,6 @@ class PriceManagerConsole:
             f"Producto creado: ID {producto.id} | {producto.nombre} | {precio.valor:.2f} {precio.moneda}"
         )
 
-    def _menu_scraper_competencia(self) -> None:
-        while True:
-            print("\nScraper de competencia")
-            print("1. Comparar un producto")
-            print("2. Ejecutar scraper de todo el catalogo y generar alertas CSV")
-            print("b. Volver")
-            opcion = input("Opcion: ").strip().lower()
-            if opcion == "b":
-                return
-            if opcion == "1":
-                self._comparar_competencia()
-                continue
-            if opcion == "2":
-                self._ejecutar_scraper_alertas()
-                continue
-            print("Opcion invalida")
-
     def _comparar_competencia(self) -> None:
         producto = self._seleccionar_producto()
         if producto is None:
@@ -609,6 +606,7 @@ class PriceManagerConsole:
             return
 
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
+        fecha_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         resultados: list[dict[str, object]] = []
 
         for producto in productos:
@@ -627,6 +625,7 @@ class PriceManagerConsole:
                         "umbral_alerta_pct": f"{umbral:.2f}",
                         "alerta": "NO",
                         "estado": "sin_cotizacion_oficial",
+                        "fecha_extraccion": fecha_extraccion,
                         "competidor_producto": "",
                         "competidor_url": "",
                     }
@@ -654,6 +653,7 @@ class PriceManagerConsole:
                         "umbral_alerta_pct": f"{umbral:.2f}",
                         "alerta": "SI" if diferencia_pct >= umbral else "NO",
                         "estado": "ok",
+                        "fecha_extraccion": fecha_extraccion,
                         "competidor_producto": str(comparacion["competitor_title"]),
                         "competidor_url": str(comparacion["competitor_url"]),
                     }
@@ -672,11 +672,14 @@ class PriceManagerConsole:
                         "umbral_alerta_pct": f"{umbral:.2f}",
                         "alerta": "NO",
                         "estado": str(exc),
+                        "fecha_extraccion": fecha_extraccion,
                         "competidor_producto": "",
                         "competidor_url": "",
                     }
                 )
 
+        self._ultimo_resultado_scraping = resultados
+        self._ultima_fecha_extraccion = fecha_extraccion
         csv_path = self._exportar_alertas_competencia_csv(resultados)
         excel_path = self._exportar_reporte_competencia_excel(resultados)
         total_alertas = sum(1 for item in resultados if item["alerta"] == "SI")
@@ -684,6 +687,30 @@ class PriceManagerConsole:
         print(f"Se generaron {total_alertas} alertas con umbral {umbral:.2f}%.")
         print(f"Archivo CSV generado: {csv_path}")
         print(f"Archivo Excel generado: {excel_path}")
+
+    def _generar_reporte_scraping(self) -> None:
+        if not self._ultimo_resultado_scraping:
+            print("No hay resultados de scraping disponibles.")
+            print("Primero ejecuta la opcion 'Ejecutar scraping'.")
+            return
+
+        excel_path = self._exportar_reporte_competencia_excel(
+            self._ultimo_resultado_scraping
+        )
+        print(f"Reporte generado: {excel_path}")
+
+    def _ver_historial_auditoria(self) -> None:
+        auditorias = self._servicio_auditoria.listar_todos()
+        if not auditorias:
+            print("No hay registros de auditoria.")
+            return
+
+        print("\nHistorial de auditoria")
+        for auditoria in auditorias:
+            print(
+                f"ID {auditoria.id} | {auditoria.fecha.isoformat(sep=' ', timespec='seconds')} | "
+                f"{auditoria.accion} | {auditoria.detalles}"
+            )
 
     def _comparar_competencia_producto(self, producto) -> None:
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
@@ -1010,7 +1037,6 @@ class PriceManagerConsole:
             ]
         )
 
-        fecha_extraccion = timestamp.strftime("%Y-%m-%d %H:%M:%S")
         for item in resultados:
             if item["estado"] != "ok":
                 continue
@@ -1023,7 +1049,7 @@ class PriceManagerConsole:
                     precio_interno,
                     precio_web,
                     diferencia,
-                    fecha_extraccion,
+                    str(item.get("fecha_extraccion") or timestamp.strftime("%Y-%m-%d %H:%M:%S")),
                 ]
             )
 

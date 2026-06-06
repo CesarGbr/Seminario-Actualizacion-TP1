@@ -640,6 +640,9 @@ class PriceManagerConsole:
             f"Diferencia numerica: {result['difference']:.2f} ({result['difference_pct']:.2f}%)"
         )
         print(f"URL: {result['competitor_url']}")
+        print(f"Imagen: {result['competitor_image_url']}")
+        print(f"Formas de pago: {result['competitor_payment_options']}")
+        print(f"Descripcion: {result['competitor_description']}")
         print("Nota: comparacion referencial segun match por nombre.")
 
     def _formatear_precio_dual(

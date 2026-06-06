@@ -1,0 +1,10 @@
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (1, 'Mouse Xiaomi Desktop', 'Mouse optico inalambrico ergonomico', 1, 1, 10);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (2, 'Teclado Mecanico Redragon', 'Switch blue retroiluminado RGB', 2, 1, 2);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (3, 'SSD Kingston NV2 1TB', 'Unidad solida NVMe Gen4', 3, 6, 3);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (4, 'Router Xiaomi Mi Router 6', 'WiFi 6 AX3000 doble banda', 4, 5, 4);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (5, 'Monitor Asus ROG Strix', 'Monitor Gamer 2.5K 18p 240Hz', 5, 4, 5);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (6, 'Memoria RAM DDR4 3200Mhz', 'Modulo alto rendimiento para PC', 6, 2, 6);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (7, 'Fuente Certificada 80 Plus', 'Fuente de poder para PC Gaming', 7, 2, 7);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (8, 'MacBook Neo 13 Chip A18', 'Notebook Apple 2026 Blush 13p', 8, 7, 8);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (9, 'Auriculares JBL Live 650', 'Cancelacion activa de ruido BT', 9, 3, 9);
+INSERT INTO productos (id, nombre, descripcion, precio_id, categoria_id, proveedor_id) VALUES (10, 'Webcam FullHD Pro', 'Camara 1080p con microfono integrado', 10, 10, 1);

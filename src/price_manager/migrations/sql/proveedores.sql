@@ -1,0 +1,10 @@
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (1, 'Distribuidora Sur', 'sur@proveedor.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (2, 'Tech Import SRL', 'ventas@techimport.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (3, 'CompuParts SA', '1122334455');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (4, 'NetWare SRL', '1144556677');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (5, 'Digital Hub SA', 'digitalhub@correo.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (6, 'Electronica Centro', '1133002200');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (7, 'Global Components SA', 'global@components.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (8, 'HardTech SA', 'hardtech@correo.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (9, 'Insumos Delta', 'delta@correo.com');
+INSERT INTO proveedores (id, nombre_legal, contacto) VALUES (10, 'Mayorista Uno', '1100998877');

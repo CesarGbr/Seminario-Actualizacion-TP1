@@ -1,0 +1,10 @@
+INSERT INTO categorias (id, nombre) VALUES (1, 'Perifericos');
+INSERT INTO categorias (id, nombre) VALUES (2, 'Hardware');
+INSERT INTO categorias (id, nombre) VALUES (3, 'Audio');
+INSERT INTO categorias (id, nombre) VALUES (4, 'Monitores');
+INSERT INTO categorias (id, nombre) VALUES (5, 'Redes');
+INSERT INTO categorias (id, nombre) VALUES (6, 'Almacenamiento');
+INSERT INTO categorias (id, nombre) VALUES (7, 'Notebooks');
+INSERT INTO categorias (id, nombre) VALUES (8, 'Gaming');
+INSERT INTO categorias (id, nombre) VALUES (9, 'Oficina');
+INSERT INTO categorias (id, nombre) VALUES (10, 'Accesorios');

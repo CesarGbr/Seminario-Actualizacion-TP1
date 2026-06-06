@@ -1,0 +1,10 @@
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (1, 49.99, 1, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (2, 79.50, 1, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (3, 125000, 2, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (4, 89900, 2, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (5, 220.00, 1, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (6, 58000, 2, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (7, 310.00, 1, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (8, 410000, 2, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (9, 67000, 2, '2026-04-10');
+INSERT INTO precios (id, valor, moneda_id, fecha_actualizacion) VALUES (10, 95.00, 1, '2026-04-10');

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from price_manager.database.connection import ConexionDB
 from price_manager.entities.entities import (
+    Auditoria,
     Categoria,
     CotizacionDolar,
     Moneda,
@@ -21,6 +22,7 @@ from price_manager.entities.entities import (
     TipoCotizacion,
 )
 from price_manager.models.models import (
+    AuditoriaModel,
     CategoriaModel,
     CotizacionDolarModel,
     MonedaModel,
@@ -98,6 +100,15 @@ def _stock_a_entidad(model: StockModel) -> Stock:
 
 def _valor_decimal(value: float) -> Decimal:
     return Decimal(str(value))
+
+
+def _auditoria_a_entidad(model: AuditoriaModel) -> Auditoria:
+    return Auditoria(
+        id=model.id,
+        accion=model.accion,
+        fecha=model.fecha,
+        detalles=model.detalles,
+    )
 
 
 def _resolver_moneda_id(sesion: Session, codigo: str) -> int:
@@ -217,6 +228,16 @@ class IRepositorioCotizacionDolar(abc.ABC):
 
     @abc.abstractmethod
     def eliminar(self, cotizacion_id: int) -> bool:
+        pass
+
+
+class IRepositorioAuditoria(abc.ABC):
+    @abc.abstractmethod
+    def crear(self, auditoria: Auditoria) -> Auditoria:
+        pass
+
+    @abc.abstractmethod
+    def leer_todos(self) -> list[Auditoria]:
         pass
 
 
@@ -769,3 +790,29 @@ class RepositorioCotizacionDolar(IRepositorioCotizacionDolar):
                 return False
             sesion.delete(model)
             return True
+
+
+class RepositorioAuditoria(IRepositorioAuditoria):
+    def __init__(self, conexion: ConexionDB | None = None) -> None:
+        self._conexion = conexion or _CONEXION_DEFAULT
+
+    def crear(self, auditoria: Auditoria) -> Auditoria:
+        with self._conexion.transaccion() as sesion:
+            model = AuditoriaModel(
+                accion=auditoria.accion,
+                fecha=auditoria.fecha,
+                detalles=auditoria.detalles,
+            )
+            sesion.add(model)
+            sesion.flush()
+            return _auditoria_a_entidad(model)
+
+    def leer_todos(self) -> list[Auditoria]:
+        sesion = self._conexion.crear_sesion()
+        try:
+            modelos = sesion.scalars(
+                select(AuditoriaModel).order_by(AuditoriaModel.fecha, AuditoriaModel.id)
+            ).all()
+            return [_auditoria_a_entidad(item) for item in modelos]
+        finally:
+            sesion.close()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from difflib import get_close_matches
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from price_manager.entities.entities import Precio
@@ -79,7 +79,7 @@ class PriceManagerConsole:
                 elif opcion == "6":
                     self._actualizar_cotizacion_tiempo_real()
                 elif opcion == "7":
-                    self._comparar_competencia()
+                    self._menu_scraper_competencia()
                 elif opcion == "9":
                     self._menu_catalogos()
                 elif opcion == "10":
@@ -569,18 +569,132 @@ class PriceManagerConsole:
             f"Producto creado: ID {producto.id} | {producto.nombre} | {precio.valor:.2f} {precio.moneda}"
         )
 
+    def _menu_scraper_competencia(self) -> None:
+        while True:
+            print("\nScraper de competencia")
+            print("1. Comparar un producto")
+            print("2. Ejecutar scraper de todo el catalogo y generar alertas CSV")
+            print("b. Volver")
+            opcion = input("Opcion: ").strip().lower()
+            if opcion == "b":
+                return
+            if opcion == "1":
+                self._comparar_competencia()
+                continue
+            if opcion == "2":
+                self._ejecutar_scraper_alertas()
+                continue
+            print("Opcion invalida")
+
     def _comparar_competencia(self) -> None:
         producto = self._seleccionar_producto()
         if producto is None:
             return
         self._comparar_competencia_producto(producto)
 
+    def _ejecutar_scraper_alertas(self) -> None:
+        productos = self._servicio_producto.listar_todos()
+        if not productos:
+            print("No hay productos cargados para analizar.")
+            return
+
+        umbral = self._read_float(
+            "Diferencia porcentual minima para alertar (o 'b' para volver): ",
+            allow_back=True,
+        )
+        if umbral is None:
+            return
+        if umbral < 0:
+            print("El umbral no puede ser negativo.")
+            return
+
+        cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
+        resultados: list[dict[str, object]] = []
+
+        for producto in productos:
+            precio_local_ars = self._obtener_precio_local_ars(producto, cotizacion_ref)
+            if precio_local_ars is None:
+                resultados.append(
+                    {
+                        "producto_id": producto.id,
+                        "producto_nombre": producto.nombre,
+                        "precio_local_moneda": producto.precio.moneda,
+                        "precio_local_original": f"{producto.precio.valor:.2f}",
+                        "precio_local_ars": "",
+                        "precio_competencia_ars": "",
+                        "diferencia_ars": "",
+                        "diferencia_pct": "",
+                        "umbral_alerta_pct": f"{umbral:.2f}",
+                        "alerta": "NO",
+                        "estado": "sin_cotizacion_oficial",
+                        "competidor_producto": "",
+                        "competidor_url": "",
+                    }
+                )
+                continue
+
+            try:
+                comparacion = self._servicio_competencia.comparar_producto(
+                    nombre_producto=producto.nombre,
+                    precio_local=precio_local_ars,
+                )
+                diferencia_pct = abs(float(comparacion["difference_pct"]))
+                resultados.append(
+                    {
+                        "producto_id": producto.id,
+                        "producto_nombre": producto.nombre,
+                        "precio_local_moneda": producto.precio.moneda,
+                        "precio_local_original": f"{producto.precio.valor:.2f}",
+                        "precio_local_ars": f"{precio_local_ars:.2f}",
+                        "precio_competencia_ars": (
+                            f"{float(comparacion['competitor_price_ars']):.2f}"
+                        ),
+                        "diferencia_ars": f"{float(comparacion['difference']):.2f}",
+                        "diferencia_pct": f"{float(comparacion['difference_pct']):.2f}",
+                        "umbral_alerta_pct": f"{umbral:.2f}",
+                        "alerta": "SI" if diferencia_pct >= umbral else "NO",
+                        "estado": "ok",
+                        "competidor_producto": str(comparacion["competitor_title"]),
+                        "competidor_url": str(comparacion["competitor_url"]),
+                    }
+                )
+            except RuntimeError as exc:
+                resultados.append(
+                    {
+                        "producto_id": producto.id,
+                        "producto_nombre": producto.nombre,
+                        "precio_local_moneda": producto.precio.moneda,
+                        "precio_local_original": f"{producto.precio.valor:.2f}",
+                        "precio_local_ars": f"{precio_local_ars:.2f}",
+                        "precio_competencia_ars": "",
+                        "diferencia_ars": "",
+                        "diferencia_pct": "",
+                        "umbral_alerta_pct": f"{umbral:.2f}",
+                        "alerta": "NO",
+                        "estado": str(exc),
+                        "competidor_producto": "",
+                        "competidor_url": "",
+                    }
+                )
+
+        csv_path = self._exportar_alertas_competencia_csv(resultados)
+        total_alertas = sum(1 for item in resultados if item["alerta"] == "SI")
+        print(f"Scraper ejecutado para {len(productos)} productos.")
+        print(f"Se generaron {total_alertas} alertas con umbral {umbral:.2f}%.")
+        print(f"Archivo CSV generado: {csv_path}")
+
     def _comparar_competencia_producto(self, producto) -> None:
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
+        precio_local_ars = self._obtener_precio_local_ars(producto, cotizacion_ref)
+        if precio_local_ars is None:
+            print(
+                "No hay cotizacion OFICIAL disponible para convertir el precio local a ARS."
+            )
+            return
         try:
             result = self._servicio_competencia.comparar_producto(
                 nombre_producto=producto.nombre,
-                precio_local=producto.precio.valor,
+                precio_local=precio_local_ars,
             )
         except RuntimeError as exc:
             error_text = str(exc)
@@ -598,7 +712,7 @@ class PriceManagerConsole:
                 print("Busqueda ambigua. Elegi una sugerencia para comparar:")
                 sugerencias = self._servicio_competencia.sugerir_productos(
                     nombre_producto=producto.nombre,
-                    precio_local=producto.precio.valor,
+                    precio_local=precio_local_ars,
                     limit=5,
                 )
                 if not sugerencias:
@@ -620,7 +734,7 @@ class PriceManagerConsole:
                 elegida = sugerencias[indice - 1]
                 result = self._servicio_competencia.comparar_producto_con_titulo(
                     nombre_producto=producto.nombre,
-                    precio_local=producto.precio.valor,
+                    precio_local=precio_local_ars,
                     competitor_title=str(elegida["title"]),
                 )
             else:
@@ -659,6 +773,18 @@ class PriceManagerConsole:
             usd = valor / cotizacion_ars_usd
             return f"{valor:.2f} ARS | {usd:.2f} USD"
         return f"{valor:.2f} {moneda_norm}"
+
+    def _obtener_precio_local_ars(
+        self, producto, cotizacion_ref: CotizacionDolar | None
+    ) -> float | None:
+        moneda = (producto.precio.moneda or "").strip().upper()
+        if moneda == "ARS":
+            return float(producto.precio.valor)
+        if moneda == "USD":
+            if cotizacion_ref is None or cotizacion_ref.valor <= 0:
+                return None
+            return float(producto.precio.valor) * cotizacion_ref.valor
+        raise ValueError(f"Moneda no soportada para competencia web: {moneda}")
 
     def _precio_en_ars_y_usd(
         self, valor: float, moneda: str, cotizacion_ars_usd: float
@@ -811,6 +937,42 @@ class PriceManagerConsole:
         print("Exportacion completada. Archivos generados:")
         for file_path in archivos_generados:
             print(f"- {file_path}")
+
+    def _exportar_alertas_competencia_csv(
+        self, resultados: list[dict[str, object]]
+    ) -> Path:
+        output_dir = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "csv"
+            / "alertas_competencia"
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = output_dir / f"alertas_competencia_{timestamp}.csv"
+        fieldnames = [
+            "producto_id",
+            "producto_nombre",
+            "precio_local_moneda",
+            "precio_local_original",
+            "precio_local_ars",
+            "precio_competencia_ars",
+            "diferencia_ars",
+            "diferencia_pct",
+            "umbral_alerta_pct",
+            "alerta",
+            "estado",
+            "competidor_producto",
+            "competidor_url",
+        ]
+
+        with file_path.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(resultados)
+
+        return file_path
 
     def _eliminar_producto(self) -> None:
         producto = self._seleccionar_producto()

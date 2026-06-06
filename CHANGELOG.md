@@ -345,10 +345,27 @@ Todas las modificaciones relevantes de este proyecto se documentan aqui.
 
 ### Agregado
 - Nueva funcion `cargar_datos_desde_sql()` en `src/price_manager/migrations/migrations.py` para cargar la base de datos a partir de archivos `.sql`.
+- Implementacion del scraper con `StarComputacionSpider` en `src/price_manager/scraper/spiders/star_computacion_spider.py`.
+- Incorporacion de `loaders` y `pipelines` para normalizar resultados de scraping y limitar la busqueda a los primeros 10 productos relevantes por consulta.
 
 ### Cambios
 - Ajuste de la estructura del proyecto para alinearla con la organizacion objetivo bajo `src/price_manager/`.
 - Creacion del directorio `src/price_manager/scraper/` como base para la futura estructura del scraper.
+- Integracion de `ServicioCompetenciaWeb` con el nuevo scraper para obtener precio, imagen, formas de pago y descripcion detallada desde Star Computacion.
 
 ### Correcciones
 - Eliminacion de `src/price_manager/price_manager.db` para evitar duplicacion con la base SQLite principal ubicada en la raiz del proyecto.
+
+---
+
+## [Sprint 3] - Dia 2
+
+### Agregado
+- Nuevo submenu de scraper de competencia en `src/price_manager/ui/console.py`.
+- Ejecucion del scraper sobre todo el catalogo con generacion de archivo CSV de alertas.
+- Exportacion de alertas en `src/price_manager/migrations/csv/alertas_competencia/`.
+
+### Cambios
+- Solicitud al usuario de una diferencia porcentual minima antes de cada corrida del scraper.
+- Comparacion de precios normalizada a ARS para soportar productos cargados en USD o ARS.
+- Registro en el CSV del estado de cada producto, incluyendo alertas y errores de comparacion.

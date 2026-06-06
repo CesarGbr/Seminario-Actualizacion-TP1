@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from datetime import date
-import html
 import json
 import os
 from pathlib import Path
 import re
-import time
+import subprocess
+import sys
 import unicodedata
 import urllib.error
 import urllib.parse
@@ -191,9 +191,6 @@ def _fetch_dolar_rate(tipo: str) -> float:
 class ServicioCompetenciaWeb:
     """Consulta precios de referencia en Star Computacion."""
 
-    _STAR_BASE_URL = "https://www.starcomputacion.com.ar/"
-    _STAR_PRODUCTS_URL = urllib.parse.urljoin(_STAR_BASE_URL, "prods/")
-    _STAR_PRODUCTS_FALLBACK = _STAR_BASE_URL
     _STOPWORDS_MATCH = {
         "de",
         "del",
@@ -211,45 +208,9 @@ class ServicioCompetenciaWeb:
         "una",
         "tipo",
     }
-
-    @classmethod
-    def _fetch_page(cls, url: str) -> str:
-        last_exc: Exception | None = None
-        for attempt in range(1, 4):
-            try:
-                request = urllib.request.Request(
-                    url,
-                    headers={
-                        "User-Agent": (
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/124.0.0.0 Safari/537.36"
-                        ),
-                        "Accept": "text/html,application/xhtml+xml",
-                        "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
-                        "Referer": cls._STAR_BASE_URL,
-                        "Cache-Control": "no-cache",
-                        "Pragma": "no-cache",
-                    },
-                )
-                with urllib.request.urlopen(request, timeout=20) as response:
-                    return response.read().decode("utf-8", errors="ignore")
-            except (urllib.error.URLError, TimeoutError) as exc:
-                last_exc = exc
-                if attempt < 3:
-                    time.sleep(0.8 * attempt)
-        raise RuntimeError("No se pudo consultar web de competencia") from last_exc
-
-    @staticmethod
-    def _parse_price_ars(raw_price: str) -> float | None:
-        match = re.search(r"ARS\s*([\d\.\,]+)", raw_price, re.I)
-        if not match:
-            return None
-        numeric = match.group(1).replace(".", "").replace(",", ".")
-        try:
-            return float(numeric)
-        except ValueError:
-            return None
+    _SCRAPER_RUNNER = (
+        Path(__file__).resolve().parents[1] / "scraper" / "runner_cli.py"
+    )
 
     @classmethod
     def _tokenize_for_match(cls, text: str) -> list[str]:
@@ -264,60 +225,71 @@ class ServicioCompetenciaWeb:
                 anchors.add(token)
         return anchors
 
-    def obtener_catalogo(self, limit: int = 40) -> list[dict[str, float | str]]:
-        """Devuelve items [{title, price_ars, url}] parseados desde Star."""
+    def obtener_catalogo(
+        self, nombre_producto: str, limit: int = 10
+    ) -> list[dict[str, float | str]]:
+        """Ejecuta el spider de Scrapy y devuelve hasta 10 resultados del producto."""
+        command = [
+            sys.executable,
+            str(self._SCRAPER_RUNNER),
+            nombre_producto,
+            str(limit),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                cwd=str(Path(__file__).resolve().parents[2]),
+            )
+        except (
+            subprocess.CalledProcessError,
+            FileNotFoundError,
+            subprocess.TimeoutExpired,
+        ) as exc:
+            raise RuntimeError("No se pudo consultar web de competencia") from exc
+
+        try:
+            payload = json.loads(completed.stdout or "[]")
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("No se pudo consultar web de competencia") from exc
+
+        if not isinstance(payload, list):
+            return []
+
         items: list[dict[str, float | str]] = []
-        product_pattern = re.compile(
-            r'<a\s+class="product"\s+href="(?P<href>[^"]+)".*?</a>',
-            re.S | re.I,
-        )
-        for source_url in (self._STAR_PRODUCTS_URL, self._STAR_PRODUCTS_FALLBACK):
-            page_html = self._fetch_page(source_url)
-            for product_match in product_pattern.finditer(page_html):
-                block = product_match.group(0)
-                href = product_match.group("href").strip()
-
-                title_match = re.search(
-                    r'<div\s+class="title">\s*(?P<title>.*?)\s*</div>',
-                    block,
-                    re.S | re.I,
-                )
-                if title_match:
-                    title = html.unescape(title_match.group("title")).strip()
-                else:
-                    alt_match = re.search(r'alt="(?P<alt>[^"]+)"', block, re.I)
-                    title = (
-                        html.unescape(alt_match.group("alt")).strip()
-                        if alt_match
-                        else ""
-                    )
-                if not title:
-                    continue
-
-                price_match = re.search(
-                    r'<div\s+class="price">\s*(?P<price_text>.*?)\s*</div>',
-                    block,
-                    re.S | re.I,
-                )
-                if not price_match:
-                    continue
-                price_ars = self._parse_price_ars(price_match.group("price_text"))
-                if price_ars is None:
-                    continue
-
-                full_url = urllib.parse.urljoin(self._STAR_BASE_URL, href)
-                items.append({"title": title, "price_ars": price_ars, "url": full_url})
-                if len(items) >= limit:
-                    return items
-            if items:
-                return items
+        for row in payload[:limit]:
+            if not isinstance(row, dict):
+                continue
+            title = str(row.get("title") or "").strip()
+            url = str(row.get("url") or "").strip()
+            price = row.get("price_ars")
+            if not title or not url or price is None:
+                continue
+            try:
+                price_ars = float(price)
+            except (TypeError, ValueError):
+                continue
+            items.append(
+                {
+                    "title": title,
+                    "price_ars": price_ars,
+                    "url": url,
+                    "image_url": str(row.get("image_url") or ""),
+                    "payment_options": str(row.get("payment_options") or ""),
+                    "description": str(row.get("description") or ""),
+                    "match_score": float(row.get("match_score") or 0),
+                }
+            )
         return items
 
     def comparar_producto(
         self, nombre_producto: str, precio_local: float
     ) -> dict[str, float | str]:
         """Compara por similitud de nombre y devuelve mejor match encontrado."""
-        ranking = self._rank_catalog(nombre_producto, precio_local, limit=120)
+        ranking = self._rank_catalog(nombre_producto, precio_local, limit=10)
         if not ranking:
             raise RuntimeError("No se encontraron productos en la web de competencia")
         best, best_ratio = ranking[0]
@@ -332,7 +304,7 @@ class ServicioCompetenciaWeb:
     def sugerir_productos(
         self, nombre_producto: str, precio_local: float, limit: int = 5
     ) -> list[dict[str, float | str]]:
-        ranking = self._rank_catalog(nombre_producto, precio_local, limit=120)
+        ranking = self._rank_catalog(nombre_producto, precio_local, limit=10)
         suggestions: list[dict[str, float | str]] = []
         for item, ratio in ranking[: max(1, limit)]:
             suggestions.append(
@@ -341,6 +313,9 @@ class ServicioCompetenciaWeb:
                     "price_ars": float(item["price_ars"]),
                     "url": str(item["url"]),
                     "match_confidence": ratio * 100,
+                    "image_url": str(item.get("image_url") or ""),
+                    "payment_options": str(item.get("payment_options") or ""),
+                    "description": str(item.get("description") or ""),
                 }
             )
         return suggestions
@@ -348,7 +323,7 @@ class ServicioCompetenciaWeb:
     def comparar_producto_con_titulo(
         self, nombre_producto: str, precio_local: float, competitor_title: str
     ) -> dict[str, float | str]:
-        catalog = self.obtener_catalogo(limit=120)
+        catalog = self.obtener_catalogo(nombre_producto=nombre_producto, limit=10)
         if not catalog:
             raise RuntimeError("No se encontraron productos en la web de competencia")
         expected = competitor_title.strip().lower()
@@ -363,7 +338,7 @@ class ServicioCompetenciaWeb:
     def _rank_catalog(
         self, nombre_producto: str, precio_local: float, limit: int = 120
     ) -> list[tuple[dict[str, float | str], float]]:
-        catalog = self.obtener_catalogo(limit=limit)
+        catalog = self.obtener_catalogo(nombre_producto=nombre_producto, limit=limit)
         if not catalog:
             return []
         product_tokens = set(self._tokenize_for_match(nombre_producto))
@@ -408,6 +383,13 @@ class ServicioCompetenciaWeb:
             "competitor_title": str(competitor_item["title"]),
             "competitor_price_ars": competitor_price,
             "competitor_url": str(competitor_item["url"]),
+            "competitor_image_url": str(competitor_item.get("image_url") or ""),
+            "competitor_payment_options": str(
+                competitor_item.get("payment_options") or ""
+            ),
+            "competitor_description": str(
+                competitor_item.get("description") or ""
+            ),
             "local_price": float(precio_local),
             "difference": diff,
             "difference_pct": diff_pct,

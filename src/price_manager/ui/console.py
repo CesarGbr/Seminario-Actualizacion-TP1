@@ -1,4 +1,4 @@
-﻿# %%writefile price_manager/ui/console.py
+
 
 from __future__ import annotations
 
@@ -7,8 +7,13 @@ from difflib import get_close_matches
 from datetime import date, datetime
 from pathlib import Path
 
-from price_manager.entities.entities import Precio
-from price_manager.entities.entities import Categoria, CotizacionDolar, Producto, Proveedor
+from price_manager.entities.entities import (
+    Categoria,
+    CotizacionDolar,
+    Precio,
+    Producto,
+    Proveedor,
+)
 from price_manager.services.services import (
     ConfiguracionRequeridaError,
     ServicioAuditoria,
@@ -338,7 +343,8 @@ class PriceManagerConsole:
                 continue
             print("Opcion invalida")
 
-    def _mostrar_detalle_producto(self, producto) -> None:
+    def _mostrar_detalle_producto(self, producto: Producto) -> None:
+        """Muestra los datos principales del producto seleccionado."""
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
         print(f"Nombre: {producto.nombre}")
         print(f"Descripcion: {producto.descripcion}")
@@ -348,7 +354,8 @@ class PriceManagerConsole:
             f"Precio: {self._formatear_precio_dual(producto.precio.valor, producto.precio.moneda, cotizacion_ref.valor if cotizacion_ref else None)}"
         )
 
-    def _actualizar_precio_producto(self, producto) -> None:
+    def _actualizar_precio_producto(self, producto: Producto) -> None:
+        """Actualiza el precio del producto seleccionado."""
         valor = self._read_float("Nuevo precio (o 'b' para volver): ", allow_back=True)
         if valor is None:
             return
@@ -584,12 +591,14 @@ class PriceManagerConsole:
         )
 
     def _comparar_competencia(self) -> None:
+        """Compara un producto elegido manualmente contra la web de competencia."""
         producto = self._seleccionar_producto()
         if producto is None:
             return
         self._comparar_competencia_producto(producto)
 
     def _ejecutar_scraper_alertas(self) -> None:
+        """Ejecuta el scraping masivo y genera archivos de salida."""
         productos = self._servicio_producto.listar_todos()
         if not productos:
             print("No hay productos cargados para analizar.")
@@ -689,6 +698,7 @@ class PriceManagerConsole:
         print(f"Archivo Excel generado: {excel_path}")
 
     def _generar_reporte_scraping(self) -> None:
+        """Genera el reporte Excel a partir del ultimo scraping ejecutado."""
         if not self._ultimo_resultado_scraping:
             print("No hay resultados de scraping disponibles.")
             print("Primero ejecuta la opcion 'Ejecutar scraping'.")
@@ -700,6 +710,7 @@ class PriceManagerConsole:
         print(f"Reporte generado: {excel_path}")
 
     def _ver_historial_auditoria(self) -> None:
+        """Lista las entradas registradas en la tabla de auditoria."""
         auditorias = self._servicio_auditoria.listar_todos()
         if not auditorias:
             print("No hay registros de auditoria.")
@@ -712,7 +723,8 @@ class PriceManagerConsole:
                 f"{auditoria.accion} | {auditoria.detalles}"
             )
 
-    def _comparar_competencia_producto(self, producto) -> None:
+    def _comparar_competencia_producto(self, producto: Producto) -> None:
+        """Compara el producto indicado contra el mejor match del scraper."""
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
         precio_local_ars = self._obtener_precio_local_ars(producto, cotizacion_ref)
         if precio_local_ars is None:
@@ -1063,7 +1075,8 @@ class PriceManagerConsole:
             return
         self._eliminar_producto_objetivo(producto)
 
-    def _eliminar_producto_objetivo(self, producto) -> bool:
+    def _eliminar_producto_objetivo(self, producto: Producto) -> bool:
+        """Elimina un producto y su stock asociado tras confirmacion del usuario."""
         confirmar = (
             input(f"Confirmar eliminacion de '{producto.nombre}'? [s/n]: ")
             .strip()
@@ -1078,6 +1091,7 @@ class PriceManagerConsole:
         return True
 
     def _eliminar_categoria(self) -> None:
+        """Elimina una categoria si no esta asociada a productos."""
         categoria = self._seleccionar_categoria_existente()
         if categoria is None:
             return
@@ -1104,6 +1118,7 @@ class PriceManagerConsole:
         print(f"Categoria eliminada: {categoria.nombre} (ID {categoria.id})")
 
     def _eliminar_proveedor(self) -> None:
+        """Elimina un proveedor si no esta asociado a productos."""
         proveedor = self._seleccionar_proveedor_existente()
         if proveedor is None:
             return

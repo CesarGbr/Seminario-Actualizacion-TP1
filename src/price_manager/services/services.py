@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from functools import wraps
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,7 @@ except ImportError:
         return False
 
 from price_manager.entities.entities import (
+    Auditoria,
     Categoria,
     CotizacionDolar,
     Moneda,
@@ -34,6 +36,7 @@ from price_manager.entities.entities import (
 )
 
 from price_manager.repositories.repositories import (
+    RepositorioAuditoria,
     RepositorioCategoria,
     RepositorioCotizacionDolar,
     RepositorioMoneda,
@@ -51,6 +54,80 @@ class ConfiguracionRequeridaError(RuntimeError):
 
 _DOTENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(dotenv_path=_DOTENV_PATH)
+_REPOSITORIO_AUDITORIA = RepositorioAuditoria()
+
+
+def _serializar_auditoria(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {
+            str(key): _serializar_auditoria(item)
+            for key, item in list(value.items())[:20]
+        }
+    if isinstance(value, (list, tuple, set)):
+        return [_serializar_auditoria(item) for item in list(value)[:20]]
+    if hasattr(value, "__dict__"):
+        payload = {}
+        for key, item in vars(value).items():
+            payload[key.lstrip("_")] = _serializar_auditoria(item)
+        return payload
+    return repr(value)
+
+
+def _registrar_auditoria(
+    accion: str,
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+    resultado: object = None,
+    error: Exception | None = None,
+) -> None:
+    detalles = {
+        "args": _serializar_auditoria(args),
+        "kwargs": _serializar_auditoria(kwargs),
+        "resultado": _serializar_auditoria(resultado),
+        "error": str(error) if error is not None else None,
+    }
+    detalles_texto = json.dumps(detalles, ensure_ascii=False, default=str)
+    if len(detalles_texto) > 1000:
+        detalles_texto = detalles_texto[:997] + "..."
+    try:
+        _REPOSITORIO_AUDITORIA.crear(
+            Auditoria(
+                accion=accion,
+                fecha=datetime.now(),
+                detalles=detalles_texto,
+            )
+        )
+    except Exception:
+        pass
+
+
+def auditar_operacion(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        accion = f"{self.__class__.__name__}.{func.__name__}"
+        try:
+            resultado = func(self, *args, **kwargs)
+        except Exception as exc:
+            _registrar_auditoria(accion, args, kwargs, error=exc)
+            raise
+        _registrar_auditoria(accion, args, kwargs, resultado=resultado)
+        return resultado
+
+    return wrapper
+
+
+def auditar_metodos_publicos(cls):
+    for nombre, valor in vars(cls).items():
+        if nombre.startswith("_"):
+            continue
+        if not callable(valor):
+            continue
+        setattr(cls, nombre, auditar_operacion(valor))
+    return cls
 
 
 def _get_api_url() -> str:
@@ -188,6 +265,7 @@ def _fetch_dolar_rate(tipo: str) -> float:
     raise RuntimeError(f"No hay cotizacion online para tipo {normalized}")
 
 
+@auditar_metodos_publicos
 class ServicioCompetenciaWeb:
     """Consulta precios de referencia en Star Computacion."""
 
@@ -397,6 +475,7 @@ class ServicioCompetenciaWeb:
         }
 
 
+@auditar_metodos_publicos
 class ServicioCategoria:
     def __init__(self, repo: RepositorioCategoria) -> None:
         self._repo = repo
@@ -417,6 +496,7 @@ class ServicioCategoria:
         return self._repo.eliminar(categoria_id)
 
 
+@auditar_metodos_publicos
 class ServicioProveedor:
     def __init__(self, repo: RepositorioProveedor) -> None:
         self._repo = repo
@@ -437,6 +517,7 @@ class ServicioProveedor:
         return self._repo.eliminar(proveedor_id)
 
 
+@auditar_metodos_publicos
 class ServicioMoneda:
     def __init__(self, repo: RepositorioMoneda) -> None:
         self._repo = repo
@@ -457,6 +538,7 @@ class ServicioMoneda:
         return self._repo.eliminar(moneda_id)
 
 
+@auditar_metodos_publicos
 class ServicioPrecio:
     def __init__(self, repo: RepositorioPrecio) -> None:
         self._repo = repo
@@ -477,6 +559,7 @@ class ServicioPrecio:
         return self._repo.eliminar(precio_id)
 
 
+@auditar_metodos_publicos
 class ServicioTipoCotizacion:
     def __init__(self, repo: RepositorioTipoCotizacion) -> None:
         self._repo = repo
@@ -497,6 +580,7 @@ class ServicioTipoCotizacion:
         return self._repo.eliminar(tipo_cotizacion_id)
 
 
+@auditar_metodos_publicos
 class ServicioCotizacionDolar:
     def __init__(
         self,
@@ -616,6 +700,7 @@ class ServicioCotizacionDolar:
         return self._repo.eliminar(cotizacion_id)
 
 
+@auditar_metodos_publicos
 class ServicioProducto:
     def __init__(
         self,
@@ -656,6 +741,7 @@ class ServicioProducto:
         return True
 
 
+@auditar_metodos_publicos
 class ServicioStock:
     def __init__(
         self, repo: RepositorioStock, servicio_producto: ServicioProducto

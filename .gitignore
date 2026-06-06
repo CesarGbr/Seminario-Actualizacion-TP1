@@ -1,6 +1,12 @@
-# CHANGELOG.md
 price_manager.db
-src/price_manager/migrations/sql/*.sql
-src/price_manager/migrations/csv/export_precios/*.csv
 .env
 *.ipynb
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+src/price_manager/migrations/csv/export_precios/*.csv
+src/price_manager/migrations/csv/alertas_competencia/*.csv
+src/price_manager/migrations/csv/alertas_competencia/*.xlsx

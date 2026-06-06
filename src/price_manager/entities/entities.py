@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 import unicodedata
 
 
@@ -433,3 +433,55 @@ class Stock:
         if value < 0:
             raise ValueError("La cantidad no puede ser negativa")
         self._cantidad = int(value)
+
+
+class Auditoria:
+    def __init__(
+        self,
+        accion: str,
+        fecha: datetime,
+        detalles: str,
+        id: int | None = None,
+    ) -> None:
+        self.id = id
+        self.accion = accion
+        self.fecha = fecha
+        self.detalles = detalles
+
+    @property
+    def id(self) -> int | None:
+        return self._id
+
+    @id.setter
+    def id(self, value: int | None) -> None:
+        if value is not None and value <= 0:
+            raise ValueError("El id de auditoria debe ser mayor a cero")
+        self._id = value
+
+    @property
+    def accion(self) -> str:
+        return self._accion
+
+    @accion.setter
+    def accion(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("La accion de auditoria no puede estar vacia")
+        self._accion = value.strip()
+
+    @property
+    def fecha(self) -> datetime:
+        return self._fecha
+
+    @fecha.setter
+    def fecha(self, value: datetime) -> None:
+        self._fecha = value
+
+    @property
+    def detalles(self) -> str:
+        return self._detalles
+
+    @detalles.setter
+    def detalles(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("Los detalles de auditoria no pueden estar vacios")
+        self._detalles = value.strip()

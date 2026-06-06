@@ -476,6 +476,15 @@ class ServicioCompetenciaWeb:
 
 
 @auditar_metodos_publicos
+class ServicioAuditoria:
+    def __init__(self, repo: RepositorioAuditoria) -> None:
+        self._repo = repo
+
+    def listar_todos(self) -> list[Auditoria]:
+        return self._repo.leer_todos()
+
+
+@auditar_metodos_publicos
 class ServicioCategoria:
     def __init__(self, repo: RepositorioCategoria) -> None:
         self._repo = repo

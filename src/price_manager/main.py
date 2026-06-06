@@ -10,6 +10,7 @@ if __package__ is None or __package__ == "":
 
 from price_manager.migrations.migrations import migrar_datos  # noqa: E402
 from price_manager.repositories.repositories import (  # noqa: E402
+    RepositorioAuditoria,
     RepositorioCategoria,
     RepositorioCotizacionDolar,
     RepositorioPrecio,
@@ -18,6 +19,7 @@ from price_manager.repositories.repositories import (  # noqa: E402
     RepositorioStock,
 )
 from price_manager.services.services import (  # noqa: E402
+    ServicioAuditoria,
     ServicioCategoria,
     ServicioCompetenciaWeb,
     ServicioCotizacionDolar,
@@ -43,6 +45,7 @@ def main(import_default_data: bool = True) -> None:
         )
 
     repo_categoria = RepositorioCategoria()
+    repo_auditoria = RepositorioAuditoria()
     repo_proveedor = RepositorioProveedor()
     repo_precio = RepositorioPrecio()
     repo_cotizacion = RepositorioCotizacionDolar()
@@ -50,6 +53,7 @@ def main(import_default_data: bool = True) -> None:
     repo_stock = RepositorioStock()
 
     servicio_categoria = ServicioCategoria(repo_categoria)
+    servicio_auditoria = ServicioAuditoria(repo_auditoria)
     servicio_proveedor = ServicioProveedor(repo_proveedor)
     servicio_precio = ServicioPrecio(repo_precio)
     servicio_cotizacion = ServicioCotizacionDolar(repo_cotizacion)
@@ -67,6 +71,7 @@ def main(import_default_data: bool = True) -> None:
         servicio_precio,
         servicio_cotizacion,
         servicio_competencia,
+        servicio_auditoria,
         servicio_categoria,
         servicio_proveedor,
     )

@@ -678,10 +678,12 @@ class PriceManagerConsole:
                 )
 
         csv_path = self._exportar_alertas_competencia_csv(resultados)
+        excel_path = self._exportar_reporte_competencia_excel(resultados)
         total_alertas = sum(1 for item in resultados if item["alerta"] == "SI")
         print(f"Scraper ejecutado para {len(productos)} productos.")
         print(f"Se generaron {total_alertas} alertas con umbral {umbral:.2f}%.")
         print(f"Archivo CSV generado: {csv_path}")
+        print(f"Archivo Excel generado: {excel_path}")
 
     def _comparar_competencia_producto(self, producto) -> None:
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
@@ -972,6 +974,60 @@ class PriceManagerConsole:
             writer.writeheader()
             writer.writerows(resultados)
 
+        return file_path
+
+    def _exportar_reporte_competencia_excel(
+        self, resultados: list[dict[str, object]]
+    ) -> Path:
+        try:
+            from openpyxl import Workbook
+        except ImportError as exc:
+            raise RuntimeError(
+                "Falta openpyxl para generar reportes Excel. Instala dependencias actualizadas."
+            ) from exc
+
+        output_dir = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "csv"
+            / "alertas_competencia"
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now()
+        file_path = output_dir / f"reporte_competencia_{timestamp.strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Reporte"
+        sheet.append(
+            [
+                "Producto",
+                "Precio interno",
+                "Precio web",
+                "Diferencia",
+                "Fecha de extracción",
+            ]
+        )
+
+        fecha_extraccion = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        for item in resultados:
+            if item["estado"] != "ok":
+                continue
+            precio_interno = f"{item['precio_local_ars']} ARS"
+            precio_web = f"{item['precio_competencia_ars']} ARS"
+            diferencia = f"{item['diferencia_ars']} ARS"
+            sheet.append(
+                [
+                    item["producto_nombre"],
+                    precio_interno,
+                    precio_web,
+                    diferencia,
+                    fecha_extraccion,
+                ]
+            )
+
+        workbook.save(file_path)
         return file_path
 
     def _eliminar_producto(self) -> None:

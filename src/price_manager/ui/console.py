@@ -992,6 +992,7 @@ class PriceManagerConsole:
             "umbral_alerta_pct",
             "alerta",
             "estado",
+            "fecha_extraccion",
             "competidor_producto",
             "competidor_url",
         ]

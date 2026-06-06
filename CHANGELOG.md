@@ -369,3 +369,51 @@ Todas las modificaciones relevantes de este proyecto se documentan aqui.
 - Solicitud al usuario de una diferencia porcentual minima antes de cada corrida del scraper.
 - Comparacion de precios normalizada a ARS para soportar productos cargados en USD o ARS.
 - Registro en el CSV del estado de cada producto, incluyendo alertas y errores de comparacion.
+
+---
+
+## [Sprint 3] - Dia 3
+
+### Agregado
+- Generacion de reporte Excel de comparacion de precios en `src/price_manager/ui/console.py`.
+- Nuevo requerimiento `openpyxl` en `requirements.txt` para exportacion `.xlsx`.
+
+### Cambios
+- La ejecucion masiva del scraper ahora genera, ademas del CSV, un archivo Excel con:
+  - producto,
+  - precio interno,
+  - precio web,
+  - diferencia,
+  - fecha de extraccion.
+
+---
+
+## [Sprint 3] - Dia 4
+
+### Agregado
+- Nueva entidad `Auditoria` en `src/price_manager/entities/entities.py`.
+- Nueva tabla `auditorias` en `src/price_manager/models/models.py`.
+- Nuevo `RepositorioAuditoria` en `src/price_manager/repositories/repositories.py`.
+- Decorador de auditoria en `src/price_manager/services/services.py` para registrar automaticamente cada operacion de servicio.
+
+### Cambios
+- Las operaciones de servicios ahora registran:
+  - accion,
+  - fecha,
+  - detalles.
+- La auditoria guarda tanto ejecuciones exitosas como errores, sin interrumpir el flujo principal del sistema.
+
+---
+
+## [Sprint 3] - Dia 5
+
+### Agregado
+- Nuevas opciones de menu en `src/price_manager/ui/console.py`:
+  - ejecutar scraping,
+  - generar reporte,
+  - ver historial de auditoria.
+- Nuevo `ServicioAuditoria` en `src/price_manager/services/services.py` para consultar registros de auditoria.
+
+### Cambios
+- El menu principal expone de forma directa las acciones de scraping y reporte ya incorporadas.
+- El reporte reutiliza los ultimos resultados de scraping disponibles en la sesion actual.

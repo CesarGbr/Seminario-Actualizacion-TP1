@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Numeric,
     String,
@@ -155,6 +156,15 @@ class StockModel(Base):
     cantidad: Mapped[int] = mapped_column(nullable=False)
 
     producto: Mapped["ProductoModel"] = relationship(back_populates="stock")
+
+
+class AuditoriaModel(Base):
+    __tablename__ = "auditorias"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    accion: Mapped[str] = mapped_column(String(120), nullable=False)
+    fecha: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    detalles: Mapped[str] = mapped_column(String(1000), nullable=False)
 
 
 def crear_tablas(engine: Engine) -> None:

@@ -6,6 +6,7 @@ import csv
 from difflib import get_close_matches
 from datetime import date, datetime
 from pathlib import Path
+import time
 
 from price_manager.entities.entities import (
     Categoria,
@@ -605,7 +606,8 @@ class PriceManagerConsole:
             return
 
         umbral = self._read_float(
-            "Diferencia porcentual minima para alertar (o 'b' para volver): ",
+            "Diferencia porcentual minima para alertar "
+            + "(ej: 10 = 10%, o 'b' para volver): ",
             allow_back=True,
         )
         if umbral is None:
@@ -613,14 +615,22 @@ class PriceManagerConsole:
         if umbral < 0:
             print("El umbral no puede ser negativo.")
             return
+        debug_mode = False
 
         cotizacion_ref = self._servicio_cotizacion.obtener_ultima_por_tipo("OFICIAL")
         fecha_extraccion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         resultados: list[dict[str, object]] = []
+        total_productos = len(productos)
 
-        for producto in productos:
+        print(
+            f"Iniciando scraping de competencia para {total_productos} productos."
+        )
+
+        for indice, producto in enumerate(productos, start=1):
+            print(f"[{indice}/{total_productos}] Consultando: {producto.nombre}")
             precio_local_ars = self._obtener_precio_local_ars(producto, cotizacion_ref)
             if precio_local_ars is None:
+                print("  - Omitido: no hay cotizacion OFICIAL para convertir a ARS.")
                 resultados.append(
                     {
                         "producto_id": producto.id,
@@ -642,11 +652,45 @@ class PriceManagerConsole:
                 continue
 
             try:
-                comparacion = self._servicio_competencia.comparar_producto(
+                started_at = time.perf_counter()
+                if debug_mode:
+                    print(
+                        "  - DEBUG: iniciando scraper "
+                        f"(query='{producto.nombre}', limit=10, include_details=0)"
+                    )
+                catalogo_competencia = self._servicio_competencia.obtener_catalogo_liviano(
+                    nombre_producto=producto.nombre,
+                    limit=10,
+                    debug_trace=debug_mode,
+                )
+                elapsed_catalog = time.perf_counter() - started_at
+                if debug_mode:
+                    print(
+                        "  - DEBUG: scraper finalizado en "
+                        f"{elapsed_catalog:.2f}s con {len(catalogo_competencia)} candidatos"
+                    )
+                    for pos, item in enumerate(catalogo_competencia[:3], start=1):
+                        print(
+                            f"    [{pos}] {item['title']} | "
+                            f"ARS {float(item['price_ars']):.2f}"
+                        )
+                    if not catalogo_competencia:
+                        print("    [sin resultados]")
+
+                if debug_mode:
+                    print("  - DEBUG: iniciando comparacion de candidatos")
+                comparacion = self._servicio_competencia.comparar_producto_en_catalogo(
+                    catalogo=catalogo_competencia,
                     nombre_producto=producto.nombre,
                     precio_local=precio_local_ars,
                 )
                 diferencia_pct = abs(float(comparacion["difference_pct"]))
+                print(
+                    "  - OK: "
+                    f"{comparacion['competitor_title']} | "
+                    f"ARS {float(comparacion['competitor_price_ars']):.2f} | "
+                    f"diff {float(comparacion['difference_pct']):.2f}%"
+                )
                 resultados.append(
                     {
                         "producto_id": producto.id,
@@ -668,6 +712,10 @@ class PriceManagerConsole:
                     }
                 )
             except RuntimeError as exc:
+                elapsed_catalog = time.perf_counter() - started_at
+                print(f"  - Error: {exc}")
+                if debug_mode:
+                    print(f"  - DEBUG: fallo luego de {elapsed_catalog:.2f}s")
                 resultados.append(
                     {
                         "producto_id": producto.id,

@@ -4,7 +4,8 @@ SPIDER_MODULES = ["price_manager.scraper.spiders"]
 NEWSPIDER_MODULE = "price_manager.scraper.spiders"
 
 ROBOTSTXT_OBEY = False
-LOG_ENABLED = False
+LOG_ENABLED = True
+LOG_LEVEL = "INFO"
 COOKIES_ENABLED = False
 DOWNLOAD_TIMEOUT = 20
 RETRY_TIMES = 2

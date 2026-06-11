@@ -12,3 +12,4 @@ class StarProductItem(scrapy.Item):
     payment_options = scrapy.Field()
     description = scrapy.Field()
     match_score = scrapy.Field()
+    source_order = scrapy.Field()

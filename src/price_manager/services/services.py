@@ -288,6 +288,9 @@ class ServicioCompetenciaWeb:
         Path(__file__).resolve().parents[1] / "scraper" / "runner_cli.py"
     )
 
+    def __init__(self) -> None:
+        self._catalogo_masivo_cache: list[dict[str, float | str]] | None = None
+
     @classmethod
     def _tokenize_for_match(cls, text: str) -> list[str]:
         tokens = [t for t in re.split(r"\W+", text.lower()) if t]
@@ -305,11 +308,61 @@ class ServicioCompetenciaWeb:
         self, nombre_producto: str, limit: int = 10
     ) -> list[dict[str, float | str]]:
         """Ejecuta el spider de Scrapy y devuelve hasta 10 resultados del producto."""
+        payload = self._ejecutar_scraper(
+            query=nombre_producto,
+            limit=limit,
+            include_details=True,
+            timeout=90,
+        )
+        return self._parse_catalog_payload(payload, limit=limit)
+
+    def obtener_catalogo_liviano(
+        self, nombre_producto: str, limit: int = 10, debug_trace: bool = False
+    ) -> list[dict[str, float | str]]:
+        """Consulta solo tarjetas/listados para acelerar el scraping masivo."""
+        payload = self._ejecutar_scraper(
+            query=nombre_producto,
+            limit=limit,
+            include_details=False,
+            timeout=90,
+            debug_trace=debug_trace,
+        )
+        return self._parse_catalog_payload(payload, limit=limit)
+
+    def obtener_catalogo_masivo(
+        self, limit: int = 500, refresh: bool = False
+    ) -> list[dict[str, float | str]]:
+        if self._catalogo_masivo_cache is not None and not refresh:
+            return list(self._catalogo_masivo_cache)
+
+        payload = self._ejecutar_scraper(
+            query="",
+            limit=limit,
+            include_details=False,
+            timeout=180,
+        )
+        catalogo = self._parse_catalog_payload(payload, limit=limit)
+        self._catalogo_masivo_cache = list(catalogo)
+        return catalogo
+
+    def limpiar_cache_catalogo(self) -> None:
+        self._catalogo_masivo_cache = None
+
+    def _ejecutar_scraper(
+        self,
+        query: str,
+        limit: int,
+        include_details: bool,
+        timeout: int,
+        debug_trace: bool = False,
+    ) -> list[dict[str, object]]:
         command = [
             sys.executable,
             str(self._SCRAPER_RUNNER),
-            nombre_producto,
+            query,
             str(limit),
+            "1" if include_details else "0",
+            "1" if debug_trace else "0",
         ]
         try:
             completed = subprocess.run(
@@ -317,24 +370,62 @@ class ServicioCompetenciaWeb:
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=90,
+                timeout=timeout,
                 cwd=str(Path(__file__).resolve().parents[2]),
             )
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ) as exc:
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            if "No module named 'scrapy'" in stderr:
+                raise RuntimeError(
+                    "No se pudo consultar web de competencia: falta instalar Scrapy."
+                ) from exc
+            if stderr:
+                raise RuntimeError(
+                    f"No se pudo consultar web de competencia: {stderr}"
+                ) from exc
             raise RuntimeError("No se pudo consultar web de competencia") from exc
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "No se pudo consultar web de competencia: no se encontro el ejecutable de Python."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                "No se pudo consultar web de competencia: la consulta excedio el "
+                f"tiempo limite de {timeout}s "
+                f"(query='{query}', limit={limit}, include_details={int(include_details)})."
+            ) from exc
 
         try:
             payload = json.loads(completed.stdout or "[]")
         except json.JSONDecodeError as exc:
+            stderr = (completed.stderr or "").strip()
+            if stderr:
+                raise RuntimeError(
+                    f"No se pudo consultar web de competencia: {stderr}"
+                ) from exc
             raise RuntimeError("No se pudo consultar web de competencia") from exc
+
+        if debug_trace:
+            stdout_text = (completed.stdout or "").strip()
+            stderr_text = (completed.stderr or "").strip()
+            print("  - DEBUG: comando scraper ejecutado")
+            print(f"    {' '.join(command)}")
+            if stderr_text:
+                print("  - DEBUG: trazas scrapy")
+                for line in stderr_text.splitlines()[-30:]:
+                    print(f"    {line}")
+            print(f"  - DEBUG: payload items={len(payload) if isinstance(payload, list) else 'invalido'}")
+            if stdout_text and not isinstance(payload, list):
+                print(f"  - DEBUG: stdout bruto={stdout_text[:300]}")
 
         if not isinstance(payload, list):
             return []
+        return payload
 
+    @staticmethod
+    def _parse_catalog_payload(
+        payload: list[dict[str, object]], limit: int
+    ) -> list[dict[str, float | str]]:
         items: list[dict[str, float | str]] = []
         for row in payload[:limit]:
             if not isinstance(row, dict):
@@ -411,12 +502,41 @@ class ServicioCompetenciaWeb:
                 return self._build_result(item, precio_local, ratio)
         raise RuntimeError("La sugerencia elegida ya no se encuentra disponible")
 
+    def comparar_producto_en_catalogo(
+        self,
+        catalogo: list[dict[str, float | str]],
+        nombre_producto: str,
+        precio_local: float,
+    ) -> dict[str, float | str]:
+        ranking = self._rank_items(
+            catalog=catalogo,
+            nombre_producto=nombre_producto,
+            precio_local=precio_local,
+        )
+        if not ranking:
+            raise RuntimeError("No se encontraron productos en la web de competencia")
+        best, best_ratio = ranking[0]
+        if best_ratio < 0.52:
+            suggestions = ", ".join(str(item["title"]) for item, _ in ranking[:5])
+            raise RuntimeError(
+                "Busqueda ambigua en competencia; sugerencias: " f"{suggestions}"
+            )
+        return self._build_result(best, precio_local, best_ratio)
+
     def _rank_catalog(
         self, nombre_producto: str, precio_local: float, limit: int = 120
     ) -> list[tuple[dict[str, float | str], float]]:
         catalog = self.obtener_catalogo(nombre_producto=nombre_producto, limit=limit)
         if not catalog:
             return []
+        return self._rank_items(catalog, nombre_producto, precio_local)
+
+    def _rank_items(
+        self,
+        catalog: list[dict[str, float | str]],
+        nombre_producto: str,
+        precio_local: float,
+    ) -> list[tuple[dict[str, float | str], float]]:
         product_tokens = set(self._tokenize_for_match(nombre_producto))
         anchor_tokens = self._extract_anchor_tokens(nombre_producto)
 

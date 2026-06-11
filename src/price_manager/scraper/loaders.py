@@ -26,8 +26,25 @@ def _clean_price(value: str) -> float | None:
         return None
 
 
+def _clean_score(value: object) -> float:
+    try:
+        return round(float(value), 4)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _clean_order(value: object) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 class StarProductLoader(ItemLoader):
     default_output_processor = TakeFirst()
+
+    query_in = MapCompose(str.strip, _clean_text)
+    query_out = TakeFirst()
 
     title_in = MapCompose(str.strip, _clean_text)
     title_out = TakeFirst()
@@ -46,3 +63,9 @@ class StarProductLoader(ItemLoader):
 
     payment_options_in = MapCompose(_clean_text)
     payment_options_out = Join(" | ")
+
+    match_score_in = MapCompose(_clean_score)
+    match_score_out = TakeFirst()
+
+    source_order_in = MapCompose(_clean_order)
+    source_order_out = TakeFirst()

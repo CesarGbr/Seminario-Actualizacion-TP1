@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 
 from scrapy.exceptions import DropItem
 
@@ -10,6 +11,7 @@ class StarProductPipeline:
 
     def __init__(self) -> None:
         self._counts: dict[str, int] = defaultdict(int)
+        self._seen_urls: dict[str, set[str]] = defaultdict(set)
 
     def process_item(self, item, spider):
         query = str(item.get("query") or "").strip()
@@ -23,6 +25,10 @@ class StarProductPipeline:
             raise DropItem("Resultado incompleto")
         if price is None:
             raise DropItem("Resultado sin precio")
+        if url in self._seen_urls[query]:
+            raise DropItem("Resultado duplicado para la busqueda")
+
+        self._seen_urls[query].add(url)
 
         self._counts[query] += 1
         if self._counts[query] > getattr(spider, "max_results", 10):
@@ -31,12 +37,40 @@ class StarProductPipeline:
         description = str(item.get("description") or "").strip()
         item["description"] = description or "Descripcion no disponible."
 
-        payment_options = item.get("payment_options")
+        payment_options = self._normalize_payment_options(item.get("payment_options"))
         if not payment_options:
             item["payment_options"] = "Formas de pago no disponibles."
+        else:
+            item["payment_options"] = payment_options
 
         image_url = str(item.get("image_url") or "").strip()
         if not image_url:
             item["image_url"] = ""
+        else:
+            item["image_url"] = image_url
+
+        item["query"] = query
+        item["title"] = title
+        item["url"] = url
 
         return item
+
+    @staticmethod
+    def _normalize_payment_options(value: object) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for raw_chunk in text.split("|"):
+            chunk = re.sub(r"\s+", " ", raw_chunk).strip(" -|")
+            if not chunk:
+                continue
+            key = chunk.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(chunk)
+
+        return " | ".join(cleaned)
